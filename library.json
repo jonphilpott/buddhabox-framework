@@ -1,0 +1,16 @@
+{
+  "name": "buddhabox",
+  "version": "0.1.0",
+  "description": "Header-only DSP and audio framework for the STM32F401 Black Pill and an I2S DAC: oscillators, filters, envelopes, effects, physical models and drums, including ports of Mutable Instruments modules.",
+  "keywords": "audio, dsp, synthesizer, stm32, i2s, mutable instruments",
+  "license": "MIT",
+  "frameworks": "arduino",
+  "platforms": "ststm32",
+  "build": {
+    "srcDir": "src",
+    "includeDir": "src"
+  },
+  "export": {
+    "exclude": ["tests", "tools", "docs", ".pio"]
+  }
+}

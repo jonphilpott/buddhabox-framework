@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BuddhaBox Framework Guide</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>Buddha<span>Box</span></h1>
+  <p>A header-only audio DSP framework for the STM32F401 Black Pill and an
+     I2S DAC: 79 classes, from simple oscillators to Mutable Instruments'
+     resonators, reverbs and drums.</p>
+</header>
+
+<nav>
+  <a href="#overview">Overview</a>
+  <a href="#quickstart">Quick start</a>
+  <a href="#hardware">Hardware</a>
+  <a href="#conventions">Conventions</a>
+  <a href="#choosing">Choosing modules</a>
+  <a href="#budget">Budgets</a>
+  <a href="#composition">Composition</a>
+  <a href="#examples">Examples</a>
+  <a href="#porting">Porting notes</a>
+  <a href="#tools">Tools</a>
+  <a href="#catalogue">Catalogue</a>
+  <a href="reference.html">API reference</a>
+</nav>
+
+<div class="container">
+
+<!-- ───────────────────────────────────────────────────────────────── -->
+<section id="overview">
+<h2>Overview</h2>
+
+<p>BuddhaBox began as one generative ambient instrument. This framework
+separates its reusable parts from that patch and adds ports of the
+components in <a href="https://github.com/pichenettes/eurorack">Mutable
+Instruments' firmware</a> (via the Partials library) that fit the Black
+Pill's 84 MHz Cortex-M4 and 64 KB of RAM.</p>
+
+<div class="stats">
+  <div class="stat-box"><div class="value">79</div><div class="label">Classes</div></div>
+  <div class="stat-box"><div class="value">~1900</div><div class="label">CPU cycles per sample</div></div>
+  <div class="stat-box"><div class="value">58 KB</div><div class="label">RAM free for DSP</div></div>
+  <div class="stat-box"><div class="value">0</div><div class="label">Heap allocations</div></div>
+</div>
+
+<h3>Design principles</h3>
+<ul>
+  <li><strong>Sample by sample.</strong> Every module has a
+    <code>process()</code> method that handles exactly one sample. You wire
+    modules together in plain C++, like patching a modular synth.</li>
+  <li><strong>Header-only.</strong> Modules live in <code>.h</code> files so
+    the compiler can inline the per-sample code. Only the audio engine has a
+    <code>.cpp</code>.</li>
+  <li><strong>Floats, normalised to ±1.</strong> All audio is
+    <code>float</code> from -1.0 to 1.0. Conversion to 16-bit happens once,
+    in your audio callback.</li>
+  <li><strong>No dynamic memory.</strong> Buffers are fixed-size arrays,
+    sized by template parameters (<code>Reverb&lt;8192&gt;</code>), so
+    PlatformIO's RAM report tells you the true cost at build time.</li>
+  <li><strong>Tables in flash.</strong> Lookup tables (sine, curves,
+    wavefolders) are <code>static const</code> arrays generated ahead of
+    time, so they cost flash (256 KB, mostly free) instead of RAM.</li>
+  <li><strong>16-bit delay storage.</strong> Delay lines store
+    <code>int16_t</code> where the signal allows, halving their RAM.</li>
+</ul>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────── -->
+<section id="quickstart">
+<h2>Quick start</h2>
+
+<h3>1. Create a project</h3>
+<p>The quickest start is the project generator. It makes a folder with a
+<code>platformio.ini</code> linked to this checkout and a
+<code>src/main.cpp</code> copied from one of the examples:</p>
+<pre><code>python3 tools/new_project.py ../my_synth
+python3 tools/new_project.py ../bells --example custom_voice
+cd ../my_synth &amp;&amp; pio run</code></pre>
+<p>To add the framework to an existing PlatformIO project instead, point <code>lib_deps</code> at this repository. A <code>symlink://</code>
+path uses your local checkout directly, so edits to the framework show up
+immediately:</p>
+<pre><code>[env:myproject]
+platform = ststm32@15.4.1
+board = blackpill_f401cc
+framework = arduino
+upload_protocol = dfu
+build_flags =
+    -O2
+    -D PIO_FRAMEWORK_ARDUINO_ENABLE_CDC
+    -D USBCON
+lib_deps =
+    symlink://../buddhabox-framework</code></pre>
+
+<h3>2. Write a patch</h3>
+<p>Every program has three parts: DSP objects as globals, an
+<code>audioCallback()</code> that fills the DAC's buffer, and a
+<code>setup()</code> that starts the engine. This is
+<code>examples/minimal/main.cpp</code>:</p>
+<!-- INCLUDE examples/minimal/main.cpp -->
+<pre><code>/**
+ * @file main.cpp
+ * @brief The smallest complete BuddhaBox program: one sine tone.
+ *
+ * Every BuddhaBox program has the same three parts:
+ * 1. DSP objects as globals (allocated at compile time, never with new).
+ * 2. audioCallback(): called by the DMA interrupt whenever the DAC needs
+ *    another block of samples. Fill the buffer one stereo frame at a time.
+ * 3. setup(): configure the objects, then start the audio engine.
+ *
+ * Wiring: PB12 -&gt; LRCLK/WSEL, PB13 -&gt; BCLK, PB15 -&gt; DIN on the UDA1334A.
+ */
+
+#include &lt;Arduino.h&gt;
+
+#include &quot;buddhabox/engine/audio_engine.h&quot;
+#include &quot;buddhabox/osc/oscillator.h&quot;
+
+using namespace bb;
+
+// 1. DSP objects.
+Oscillator osc;
+
+/**
+ * Fill one block of audio. Runs in interrupt context: no Serial, no
+ * analogRead(), no allocation.
+ *
+ * @param buffer  Interleaved stereo int16 samples [L, R, L, R, ...]
+ * @param length  Number of int16 values (frames * 2)
+ */
+void audioCallback(int16_t *buffer, uint16_t length) {
+  for (uint16_t i = 0; i &lt; length; i += 2) {
+    // DSP works in floats from -1.0 to 1.0; convert to 16-bit only here,
+    // with a little headroom (32000 rather than 32767).
+    float sample = osc.process();
+    int16_t s = (int16_t)(clampf(sample, -1.0f, 1.0f) * 32000.0f);
+    buffer[i] = s;     // left
+    buffer[i + 1] = s; // right
+  }
+}
+
+void setup() {
+  // 3. Configure, then start the DMA. Audio begins immediately.
+  osc.setWaveform(Waveform::SINE);
+  osc.setFrequency(220.0f);
+  osc.setAmplitude(0.5f);
+  AudioEngine::begin();
+}
+
+void loop() {
+  // Nothing to do: the interrupt keeps the audio flowing. Read pots or
+  // buttons here and pass the values to the DSP objects.
+}</code></pre>
+<!-- /INCLUDE -->
+
+<h3>3. Build and upload</h3>
+<ol>
+  <li><code>pio run</code> to build (it must compile cleanly before you
+    flash).</li>
+  <li>Put the Black Pill in DFU mode: hold <strong>BOOT0</strong>, press and
+    release <strong>NRST</strong>, release <strong>BOOT0</strong>.</li>
+  <li><code>pio run -t upload</code>.</li>
+  <li>Optional: <code>pio device monitor</code> to read
+    <code>Serial</code> output, such as the CPU meter.</li>
+</ol>
+
+<div class="tip"><strong>Is my patch too heavy?</strong> Call
+<code>AudioEngine::cpuLoad()</code> from <code>loop()</code> and print it.
+It reports the fraction of each audio block the callback used, measured
+with the Cortex-M4's cycle counter. Keep it below about 0.8.</div>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────── -->
+<section id="hardware">
+<h2>Hardware</h2>
+
+<h3>Components</h3>
+<ul>
+  <li><strong>WeAct Studio Black Pill V2.0</strong> (STM32F401CCU6)</li>
+  <li><strong>UDA1334A I2S DAC</strong> breakout, or a <strong>MAX98357A</strong>
+    I2S amplifier to drive a speaker directly</li>
+  <li>Optional: pots, switches, an MPR121 touch board, a CD74HC4067
+    multiplexer or a diode-matrix keypad (drivers in <code>io/</code>)</li>
+</ul>
+
+<h3>Wiring: Black Pill to UDA1334A</h3>
+<table class="wiring-table">
+  <tr><th>Black Pill</th><th>UDA1334A</th><th>Signal</th><th>Notes</th></tr>
+  <tr><td>PB12</td><td>WSEL</td><td>LRCLK</td><td>Left/right word select, 44.1 kHz</td></tr>
+  <tr><td>PB13</td><td>BCLK</td><td>Bit clock</td><td>32 x the sample rate</td></tr>
+  <tr><td>PB15</td><td>DIN</td><td>Data</td><td>Philips I2S, MSB first</td></tr>
+  <tr><td>GND</td><td>GND, MUTE, SF0, SF1</td><td>Ground</td><td>Tie MUTE and SF0/SF1 low for standard I2S</td></tr>
+  <tr><td>3V3</td><td>VIN</td><td>Power</td><td>Some boards accept 3.3&ndash;5 V</td></tr>
+</table>
+
+<h3>Wiring: Black Pill to MAX98357A</h3>
+<table class="wiring-table">
+  <tr><th>Black Pill</th><th>MAX98357A</th><th>Signal</th><th>Notes</th></tr>
+  <tr><td>PB12</td><td>LRC</td><td>Word select</td><td></td></tr>
+  <tr><td>PB13</td><td>BCLK</td><td>Bit clock</td><td></td></tr>
+  <tr><td>PB15</td><td>DIN</td><td>Data</td><td></td></tr>
+  <tr><td>GND</td><td>GND</td><td>Ground</td><td></td></tr>
+  <tr><td>5V</td><td>VIN</td><td>Power</td><td>5 V for full volume</td></tr>
+  <tr><td>(open)</td><td>SD</td><td>Mode</td><td>Floating = (left + right) / 2 mono</td></tr>
+</table>
+
+<div class="note"><strong>Fixed pins.</strong> PB12, PB13 and PB15 are the
+STM32F401's SPI2/I2S2 alternate function (AF5). Other pins would need a
+different I2S peripheral and changes to
+<code>engine/audio_engine.cpp</code>.</div>
+
+<h3>Signal path</h3>
+<div class="flow">
+  <span class="node">your patch<small>audioCallback()</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="node">DMA buffer<small>2 x 256 frames</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="node">I2S2<small>PB12 / PB13 / PB15</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="node out">DAC<small>UDA1334A / MAX98357A</small></span>
+</div>
+<p class="flow-caption">While the DMA plays one half of the buffer, the
+callback fills the other: about 5.8 ms per half at 44.1 kHz.</p>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────── -->
+<section id="conventions">
+<h2>Conventions</h2>
+
+<h3>Every module works out of the box</h3>
+<p>Constructors set sensible defaults, so a global <code>Svf filter;</code>
+is ready to use. The modules ported from Mutable Instruments also have
+<code>init(float sampleRate = SAMPLE_RATE)</code>, which resets them to
+silence; you only need to call it to restart a voice.</p>
+
+<h3>process() comes in a few shapes</h3>
+<table>
+  <tr><th>Shape</th><th>Used by</th><th>Example</th></tr>
+  <tr><td><code>float process()</code></td><td>Sources</td><td><code>float s = osc.process();</code></td></tr>
+  <tr><td><code>float process(float in)</code></td><td>Filters, effects, resonators</td><td><code>float y = decimator.process(x);</code></td></tr>
+  <tr><td><code>float process(bool gate)</code></td><td>Envelopes, clocked modulators</td><td><code>float e = env.process(keyDown);</code></td></tr>
+  <tr><td><code>void process(float&amp; l, float&amp; r)</code></td><td>Stereo effects (in place)</td><td><code>reverb.process(l, r);</code></td></tr>
+  <tr><td><code>SvfOut process(float in)</code></td><td>Multi-output filters</td><td><code>float bp = svf.process(x).bp;</code></td></tr>
+</table>
+
+<h3>Control rate versus audio rate</h3>
+<p>Setters that call <code>expf()</code>, <code>powf()</code> or
+<code>tanf()</code> say so in their docstring. Call those from setup, from
+<code>loop()</code>, or every 16&ndash;64 samples inside the callback,
+rather than every sample. Per-sample paths use table lookups and the
+fast <code>fastExp2()</code>/<code>fastLog2()</code> in
+<code>core/dsp_common.h</code>.</p>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────── -->
+<section id="choosing">
+<h2>Choosing between similar modules</h2>
+<p>Several jobs have both an original BuddhaBox module and a Mutable
+Instruments one. They are deliberately different, not duplicates:</p>
+<table>
+  <tr><th>Job</th><th>Simpler (BuddhaBox)</th><th>Richer (Mutable Instruments)</th></tr>
+  <tr><td>Classic waveforms</td><td><code>Oscillator</code>: naive, cheapest, aliases at high pitch</td><td><code>BasicOscillator</code>, <code>VariableShapeOscillator</code>: band-limited, pulse width, sync</td></tr>
+  <tr><td>State-variable filter</td><td><code>SVFilter</code>: Hz + 0..1 resonance, cutoff up to fs/4</td><td><code>Svf</code>: accurate to Nyquist, Q, cheap per-sample sweeps</td></tr>
+  <tr><td>Envelope</td><td><code>Envelope</code>: attack/sustain/release</td><td><code>SegmentEnvelope</code>: ADSR, AD, looping, custom segments; <code>Slope</code>: Tides-style shapes</td></tr>
+  <tr><td>Low-pass gate</td><td><code>LowPassGate</code>: follows a 0..1 control</td><td><code>VactrolLpg</code>: pingable, built-in vactrol decay; <code>Vactrol</code>: the cell model alone</td></tr>
+  <tr><td>Wavefolder</td><td><code>WaveFolder</code>: threshold reflection</td><td><code>TableWavefolder</code>: Plaits' smooth and analog curves</td></tr>
+  <tr><td>Plucked string</td><td><code>KarplusStrong</code>: self-contained pluck</td><td><code>StringModel</code> + <code>Plucker</code>: dispersion, buzzing bridge, any exciter</td></tr>
+  <tr><td>Random numbers</td><td><code>LFSR</code>: occasional decisions, entropy input</td><td><code>Random</code>: audio-rate noise (every call scrambles all bits)</td></tr>
+  <tr><td>Glide</td><td><code>SlewLimiter</code>: fixed time in seconds</td><td><code>Lag</code>: glide time follows a clock</td></tr>
+  <tr><td>Scales</td><td><code>Colour</code>: 16 five-note just-intonation scales, ordered dark to bright, plus a melody maker</td><td><code>Quantizer</code>: snaps a control to any equal-tempered scale, with weighted notes</td></tr>
+</table>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────── -->
+<section id="budget">
+<h2>Memory and CPU budgets</h2>
+
+<p>The Black Pill gives you about <strong>1,900 CPU cycles per
+sample</strong> (84 MHz &divide; 44.1 kHz) and <strong>64 KB of RAM</strong>,
+of which the Arduino core, USB serial and the DMA buffer take about 6 KB.
+RAM figures below are <code>sizeof()</code> of each object, measured.
+Relative cost is an estimate from each module's per-sample work: measure
+your own patch with <code>AudioEngine::cpuLoad()</code>.</p>
+
+<h3>Modules with a large footprint</h3>
+<table>
+  <tr><th>Module</th><th>RAM</th><th>Relative cost</th><th>Notes</th></tr>
+  <tr><td><code>Reverb&lt;16384&gt;</code> (default)</td><td>32.2 KB</td><td>Medium</td><td>Clouds' size; <code>Reverb&lt;8192&gt;</code> is 16.2 KB, a smaller room</td></tr>
+  <tr><td><code>StringModel&lt;2048&gt;</code> (default)</td><td>12.2 KB</td><td>Medium</td><td><code>StringModel&lt;1024&gt;</code> is 6.2 KB</td></tr>
+  <tr><td><code>ModalResonator&lt;512&gt;</code> (bowed)</td><td>17.8 KB</td><td>Heavy</td><td>Without bowing (<code>&lt;&gt;</code>): 1.9 KB</td></tr>
+  <tr><td><code>Ensemble&lt;4096&gt;</code></td><td>8.1 KB</td><td>Light</td><td></td></tr>
+  <tr><td><code>Diffuser&lt;4096&gt;</code></td><td>8.1 KB</td><td>Light</td><td></td></tr>
+  <tr><td><code>PitchShifter&lt;4096&gt;</code></td><td>8.1 KB</td><td>Light</td><td></td></tr>
+  <tr><td><code>DelayLine&lt;4096&gt;</code></td><td>8.0 KB</td><td>Light</td><td>2 bytes per sample</td></tr>
+  <tr><td><code>Chorus&lt;2048&gt;</code></td><td>4.1 KB</td><td>Light</td><td></td></tr>
+  <tr><td><code>Tube&lt;1024&gt;</code></td><td>4.1 KB</td><td>Light</td><td></td></tr>
+  <tr><td><code>AllpassFilter&lt;2048&gt;</code></td><td>4.0 KB</td><td>Light</td><td></td></tr>
+  <tr><td><code>KarplusStrong&lt;1024&gt;</code></td><td>2.0 KB</td><td>Light</td><td></td></tr>
+  <tr><td><code>Plucker</code></td><td>1.1 KB</td><td>Light</td><td></td></tr>
+</table>
+<p>Everything else uses under 0.5 KB.</p>
+
+<h3>Modules with a high CPU cost</h3>
+<ul>
+  <li><strong>ModalResonator</strong>: about 20 cycles per mode. The default
+    is 24 modes; 12&ndash;16 is plenty for bells and bowls.</li>
+  <li><strong>HarmonicOscillator</strong>: about 4 cycles per harmonic, up
+    to 32.</li>
+  <li><strong>FmOperators</strong>: about 25 cycles per operator, up to 6.</li>
+  <li><strong>VowelFilter</strong>, <strong>AnalogSnare</strong>: five
+    filters each.</li>
+  <li><strong>Reverb</strong>: about 25 delay operations per sample.</li>
+</ul>
+
+<h3>What the examples use</h3>
+<table>
+  <tr><th>Example</th><th>RAM</th><th>Flash</th></tr>
+  <tr><td>minimal</td><td>6.1 KB</td><td>27 KB</td></tr>
+  <tr><td>drum_machine</td><td>7.1 KB</td><td>46 KB</td></tr>
+  <tr><td>custom_voice</td><td>28.7 KB</td><td>40 KB</td></tr>
+  <tr><td>singing_bowls</td><td>41.3 KB</td><td>59 KB</td></tr>
+  <tr><td>compile_all (every module)</td><td>53.9 KB</td><td>173 KB</td></tr>
+</table>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────── -->
+<section id="composition">
+<h2>Composing new modules</h2>
+
+<p>You extend the framework by writing classes in your own project, not by
+editing it. There are two patterns.</p>
+
+<h3>Pattern 1: a voice class that owns modules</h3>
+<p>Wrap a few modules in a class with a small, musical interface. The
+class owns its parts as members (so their memory is fixed at compile
+time), configures them in its constructor, and wires them in its own
+<code>process()</code>.</p>
+<div class="flow">
+  <span class="node mod">strike()<small>one-sample impulse</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="node">ModalResonator<small>12 modes, bell-like</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="node">VactrolLpg<small>darkens as it decays</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="node out">process()</span>
+</div>
+<p class="flow-caption">BellVoice: the class below hides two modules
+behind setPitch(), strike() and process().</p>
+
+<h3>Pattern 2: an effect built on FxEngine</h3>
+<p><code>FxEngine&lt;SIZE&gt;</code> is the toolkit Reverb, Chorus,
+Ensemble, Diffuser and PitchShifter are written with. You declare delay
+lines in one shared buffer, then each sample run a tiny "program" on an
+accumulator: <code>read()</code> values in, <code>write()</code> them to
+lines, <code>lp()</code>/<code>hp()</code> to filter.</p>
+<div class="flow">
+  <span class="node">left in</span><span class="arrow">&rarr;</span>
+  <span class="node">left line</span><span class="arrow">&rarr;</span>
+  <span class="node out">right out</span>
+  <span class="arrow">&harr;</span>
+  <span class="node out">left out</span><span class="arrow">&larr;</span>
+  <span class="node">right line</span><span class="arrow">&larr;</span>
+  <span class="node">right in</span>
+</div>
+<p class="flow-caption">PingPongEcho: each line feeds the other, so every
+repeat bounces to the opposite side.</p>
+
+<h3>The complete example</h3>
+<p>Both classes, and a patch that plays three bells through the echo
+(<code>examples/custom_voice/main.cpp</code>, built by
+<code>pio run -e custom_voice</code>):</p>
+<!-- INCLUDE examples/custom_voice/main.cpp -->
+<pre><code>/**
+ * @file main.cpp
+ * @brief Composition example: build your own voice and your own effect.
+ *
+ * Two patterns for extending the framework without touching it:
+ *
+ * 1. A voice class (BellVoice) that owns existing modules and exposes a
+ *    small, musical interface: setPitch(), strike(), process().
+ * 2. An effect class (PingPongEcho) written on FxEngine, the same toolkit
+ *    the Reverb and Chorus are built with.
+ *
+ * The patch: three bells play notes chosen by a RandomSequence and snapped
+ * to a pentatonic scale by a Quantizer, into a ping-pong echo, then a
+ * limiter.
+ */
+
+#include &lt;Arduino.h&gt;
+
+#include &quot;buddhabox/core/dsp_common.h&quot;
+#include &quot;buddhabox/dynamics/vactrol_lpg.h&quot;
+#include &quot;buddhabox/engine/audio_engine.h&quot;
+#include &quot;buddhabox/fx/fx_engine.h&quot;
+#include &quot;buddhabox/fx/limiter.h&quot;
+#include &quot;buddhabox/mod/clock.h&quot;
+#include &quot;buddhabox/mod/quantizer.h&quot;
+#include &quot;buddhabox/mod/random_sequence.h&quot;
+#include &quot;buddhabox/physical/modal_resonator.h&quot;
+
+using namespace bb;
+
+/**
+ * A struck bell: a modal resonator through a vactrol low-pass gate.
+ *
+ * The resonator rings; the gate adds the natural &quot;darkening&quot; of a real
+ * decay (quieter and duller together). Each strike is a one-sample
+ * impulse into the resonator plus a ping of the gate.
+ *
+ * Example:
+ *   BellVoice bell;
+ *   bell.setPitch(440.0f);
+ *   bell.strike(0.8f);
+ *   float s = bell.process();
+ */
+class BellVoice {
+public:
+  BellVoice() {
+    resonator_.setModes(12);       // 12 modes keep three bells affordable
+    resonator_.setStructure(0.2f); // bell-like, slightly inharmonic
+    resonator_.setDamping(0.75f);
+    resonator_.setPosition(0.3f);
+    lpg_.setDecay(0.8f);
+    lpg_.setColour(0.6f);
+  }
+
+  /**
+   * Tune the bell.
+   * @param hz  Fundamental in Hz
+   */
+  void setPitch(float hz) {
+    resonator_.setFrequency(hz);
+    lpg_.setAttackPitch(hz); // higher bells open faster, as in Plaits
+  }
+
+  /**
+   * Strike the bell.
+   * @param velocity  0.0 to 1.0
+   */
+  void strike(float velocity) {
+    impulse_ = velocity;
+    lpg_.trigger();
+  }
+
+  /**
+   * Generate the next sample.
+   * @return  The bell, about ±1
+   */
+  float process() {
+    float excitation = impulse_;
+    impulse_ = 0.0f; // the strike lasts exactly one sample
+    return lpg_.process(resonator_.process(excitation));
+  }
+
+private:
+  ModalResonator&lt;&gt; resonator_;
+  VactrolLpg lpg_;
+  float impulse_ = 0.0f;
+};
+
+/**
+ * Stereo ping-pong echo written on FxEngine.
+ *
+ * Two delay lines cross-feed: the left echo feeds the right line and
+ * vice versa, so each repeat bounces to the other side.
+ *
+ * @tparam SIZE  FxEngine buffer (power of two); RAM = SIZE * 2 bytes
+ *
+ * Example:
+ *   PingPongEcho&lt;8192&gt; echo;
+ *   float l = in, r = in;
+ *   echo.process(l, r);
+ */
+template &lt;uint32_t SIZE = 8192&gt; class PingPongEcho {
+public:
+  PingPongEcho() {
+    // Declare the lines once, then allocate: each line is just a region
+    // of the shared buffer. Half the buffer each, minus the gap samples.
+    left_ = engine_.addDelay(SIZE / 2 - 2);
+    right_ = engine_.addDelay(SIZE / 2 - 2);
+    engine_.allocate();
+  }
+
+  /** @param x  Feedback per bounce, 0.0 to 0.9 */
+  void setFeedback(float x) { feedback_ = clampf(x, 0.0f, 0.9f); }
+
+  /** @param x  Wet amount, 0.0 to 1.0 */
+  void setAmount(float x) { amount_ = x; }
+
+  /**
+   * Process one stereo sample in place.
+   * @param left   Left in/out
+   * @param right  Right in/out
+   */
+  void process(float &amp;left, float &amp;right) {
+    FxEngine&lt;SIZE&gt; &amp;c = engine_;
+    float echoL, echoR;
+    c.start(); // advance every line by one sample
+    // Left line: the dry left plus feedback from the right line&#x27;s tail.
+    c.read(left, 0.5f);
+    c.readTail(right_, feedback_);
+    c.write(left_, 0.0f);
+    // Right line: the dry right plus feedback from the left line&#x27;s tail.
+    c.read(right, 0.5f);
+    c.readTail(left_, feedback_);
+    c.write(right_, 0.0f);
+    // Outputs: each side hears the *other* line&#x27;s tail.
+    c.readTail(right_, 1.0f);
+    c.write(echoL, 0.0f);
+    c.readTail(left_, 1.0f);
+    c.write(echoR, 0.0f);
+    left += amount_ * echoL;
+    right += amount_ * echoR;
+  }
+
+private:
+  FxEngine&lt;SIZE&gt; engine_;
+  typename FxEngine&lt;SIZE&gt;::Delay left_, right_;
+  float feedback_ = 0.5f, amount_ = 0.4f;
+};
+
+// ── The patch ───────────────────────────────────────────────────────────
+const int kNumBells = 3;
+BellVoice bells[kNumBells];
+PingPongEcho&lt;8192&gt; echo; // 16 KB: about 93 ms per side
+Limiter limiter;
+TempoClock clock8(84.0f, 2); // eighth notes at 84 BPM
+RandomSequence melody;
+Quantizer scale;
+Random rng;
+int nextBell = 0;
+
+/**
+ * On each eighth note, maybe strike the next bell at a new pitch.
+ */
+void onTick() {
+  if (rng.uniform() &gt; 0.6f)
+    return;                                       // leave space
+  float pitch = 1.5f * melody.next();             // 0 to 1.5 octaves
+  float q = scale.process(pitch, 0.7f);           // snap to the scale
+  bells[nextBell].setPitch(220.0f * fastExp2(q)); // from A3
+  bells[nextBell].strike(0.5f + 0.5f * rng.uniform());
+  nextBell = (nextBell + 1) % kNumBells; // round-robin voices
+}
+
+/**
+ * Fill one block of audio.
+ * @param buffer  Interleaved stereo int16 samples
+ * @param length  Number of int16 values (frames * 2)
+ */
+void audioCallback(int16_t *buffer, uint16_t length) {
+  for (uint16_t i = 0; i &lt; length; i += 2) {
+    if (clock8.process())
+      onTick();
+    float mix = 0.0f;
+    for (int b = 0; b &lt; kNumBells; ++b)
+      mix += bells[b].process() * 0.4f;
+    float left = mix, right = mix;
+    echo.process(left, right);
+    limiter.process(left, right);
+    buffer[i] = (int16_t)(left * 32000.0f);
+    buffer[i + 1] = (int16_t)(right * 32000.0f);
+  }
+}
+
+void setup() {
+  scale.init(Quantizer::preset(Quantizer::PENTATONIC));
+  melody.setLength(8);
+  melody.setDejaVu(0.3f);
+  echo.setFeedback(0.55f);
+  Serial.begin(115200);
+  AudioEngine::begin();
+}
+
+/** Print the measured CPU load once a second (pio device monitor). */
+void loop() {
+  Serial.print(&quot;CPU: &quot;);
+  Serial.print(AudioEngine::cpuLoad() * 100.0f, 1);
+  Serial.println(&quot;%&quot;);
+  delay(1000);
+}</code></pre>
+<!-- /INCLUDE -->
+
+<h3>Key principles</h3>
+<ul>
+  <li><strong>Own, don't allocate.</strong> Members and template sizes, never
+    <code>new</code>. Arrays of voices (<code>BellVoice bells[3];</code>)
+    give you polyphony.</li>
+  <li><strong>Exciter into resonator.</strong> Most physical sounds are a
+    short burst (Dust, Plucker, an impulse, noise through an envelope) into
+    something that rings (ModalResonator, StringModel, Svf with high Q).</li>
+  <li><strong>Modulate at control rate.</strong> Update slow parameters
+    every 16&ndash;64 samples with a counter, as
+    <code>examples/singing_bowls</code> does.</li>
+  <li><strong>Finish with a Limiter.</strong> Resonators and feedback can
+    exceed ±1; the limiter keeps the 16-bit conversion from clipping.</li>
+</ul>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────── -->
+<section id="examples">
+<h2>Example programs</h2>
+
+<h3>singing_bowls</h3>
+<div class="flow">
+  <span class="stack">
+    <span class="node">Dust &rarr; ModalResonator</span>
+    <span class="node">Particle</span>
+    <span class="node">StringSynth &rarr; Svf</span>
+  </span>
+  <span class="arrow">&rarr;</span>
+  <span class="node">Hilbert shift<small>right channel</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="node">Reverb</span>
+  <span class="arrow">&rarr;</span>
+  <span class="node out">Limiter</span>
+  <span class="node mod">Lorenz<small>structure, cutoff, shift</small></span>
+</div>
+<p>Random strikes on a bell-like resonator, glassy pings and a filtered
+string-machine drone. A Lorenz attractor drifts the timbre so the patch
+never repeats, and a frequency shift of a fraction of a hertz on the right
+channel makes the reverb tail swirl.</p>
+
+<h3>drum_machine</h3>
+<div class="flow">
+  <span class="node mod">TempoClock<small>16ths</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="stack">
+    <span class="node">AnalogKick</span><span class="node">AnalogSnare</span>
+    <span class="node">HiHat</span><span class="node">FmDrum</span>
+  </span>
+  <span class="arrow">&rarr;</span>
+  <span class="node">Overdrive</span>
+  <span class="arrow">&rarr;</span>
+  <span class="node out">Limiter</span>
+</div>
+<p>A fixed kick and backbeat, with hats and toms varied by a
+RandomSequence whose déjà-vu setting makes the variations loop.</p>
+
+<h3>custom_voice</h3>
+<p>The composition example above.</p>
+
+<h3>compile_all</h3>
+<p>Not musical: instantiates every class so <code>pio run -e
+compile_all</code> proves the whole framework builds, and reports the
+combined RAM and flash.</p>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────── -->
+<section id="porting">
+<h2>Porting notes: Partials to BuddhaBox</h2>
+<p>The Mutable Instruments modules come from the Partials library, which
+targets desktop VCV Rack plugins. Running them on the Black Pill needed
+these changes:</p>
+<ul>
+  <li><strong>Heap to fixed arrays.</strong> <code>std::vector</code> buffers
+    became template-sized arrays (<code>Reverb&lt;SIZE&gt;</code>,
+    <code>StringModel&lt;MAX_DELAY&gt;</code>, <code>Tube&lt;SIZE&gt;</code>,
+    <code>ModalResonator&lt;BOW_DELAY&gt;</code>).</li>
+  <li><strong>RAM tables to flash.</strong> Tables Partials computed at
+    start-up are generated by <code>tools/gen_tables.cpp</code> as
+    <code>static const</code> arrays. Tides' 57 KB of Slope tables alone
+    would not have fitted in RAM.</li>
+  <li><strong>16-bit effect buffers.</strong> FxEngine stores
+    <code>int16_t</code> scaled to ±4 (reverb internals reach about ±2.3),
+    giving a noise floor near -89 dBFS. The bowed-mode delays stay float:
+    their signal is tiny and the loop resonant, so 16 bits audibly changed
+    the tone.</li>
+  <li><strong>Buffers that fit.</strong> When a template size is smaller
+    than an effect's original delays, every delay shrinks in proportion
+    (<code>fitScale()</code>), giving a smaller room rather than a crash.</li>
+  <li><strong>No per-sample transcendentals.</strong> <code>exp()</code>,
+    <code>pow()</code>, <code>log10()</code>, <code>sin()</code> and
+    <code>tanh()</code> in per-sample code became table reads,
+    <code>fastExp2()</code>/<code>fastLog2()</code> or rational
+    approximations. Double-precision maths (software-emulated on the M4)
+    was removed from everything except one-off filter design in
+    <code>Hilbert::init()</code>.</li>
+  <li><strong>One namespace.</strong> Everything is in <code>bb</code>.
+    Clashing names were renamed: Partials' <code>Envelope</code> is
+    <code>SegmentEnvelope</code>, <code>LowPassGate</code> is
+    <code>VactrolLpg</code>, <code>Wavefolder</code> is
+    <code>TableWavefolder</code>, and <code>String</code> is
+    <code>StringModel</code> (Arduino already has a <code>String</code>).</li>
+  <li><strong>Defaults.</strong> Every class constructs itself at
+    <code>SAMPLE_RATE</code> (44.1 kHz); ModalResonator defaults to 24 modes
+    instead of 64.</li>
+  <li><strong>Not ported.</strong> Vocoder (160 filters, far too heavy),
+    OnsetDetector (needs an audio input), WAV and sample buffers (no file
+    system, no spare RAM), and Wavetable (heap-based; easy to add as a
+    flash table when needed).</li>
+</ul>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────── -->
+<section id="tools">
+<h2>Tools and tests</h2>
+<ul>
+  <li><code>tests/compare_partials.cpp</code> runs every ported class next
+    to its Partials original on the same input and reports the largest
+    difference. All 68 checks pass: most match exactly; table-based and
+    16-bit versions differ by under 0.3% of peak.
+    <pre><code>clang++ -std=c++14 -O2 -I src -I ../partials/include \
+    tests/compare_partials.cpp -o /tmp/compare &amp;&amp; /tmp/compare</code></pre></li>
+  <li><code>tools/new_project.py</code> creates a new project on the
+    framework: <code>platformio.ini</code>, <code>.gitignore</code> and a
+    <code>src/main.cpp</code> copied from an example
+    (<code>--example</code>, default <code>minimal</code>). It refuses to
+    write into a folder that isn't empty.</li>
+  <li><code>tools/gen_tables.cpp</code> regenerates the flash lookup
+    tables.</li>
+  <li><code>tools/gen_docs.py</code> regenerates <code>reference.html</code>
+    from the docstrings, and the catalogue and code listings on this
+    page.</li>
+</ul>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────────── -->
+<section id="catalogue">
+<h2>Module catalogue</h2>
+<p>Every header, with links to its full API in the
+<a href="reference.html">reference</a>.</p>
+<!-- CATALOGUE -->
+<h3>Core</h3><div class="catalogue">
+<div><a href="reference.html#dsp-common-h">dsp_common.h</a> — Shared constants, types, and utility functions for the BuddhaBox DSP</div>
+<div><a href="reference.html#midi-utils-h">midi_utils.h</a> — MIDI note number to frequency conversion and note constants.</div>
+<div><a href="reference.html#lfsr">LFSR</a>, <a href="reference.html#random">Random</a> — LFSR-based random number generator for non-audio randomness.</div>
+</div>
+<h3>Audio engine</h3><div class="catalogue">
+<div><a href="reference.html#audio-engine-h">audio_engine.h</a> — I2S DMA audio output engine for the UDA1334A DAC.</div>
+</div>
+<h3>Oscillators</h3><div class="catalogue">
+<div><a href="reference.html#basicoscillator">BasicOscillator</a> — Plaits&#x27; alias-free saw / square / triangle / slope oscillator.</div>
+<div><a href="reference.html#formantoscillator">FormantOscillator</a> — Plaits&#x27; formant oscillator: a hard-synced sine.</div>
+<div><a href="reference.html#grainletoscillator">GrainletOscillator</a> — Plaits&#x27; grainlet oscillator: one windowed sine grain per cycle.</div>
+<div><a href="reference.html#harmonicoscillator">HarmonicOscillator</a> — Additive oscillator: up to 32 harmonics from one sine.</div>
+<div><a href="reference.html#lfo">LFO</a> — Low Frequency Oscillator for modulating audio parameters over time.</div>
+<div><a href="reference.html#oscillator">Oscillator</a> — Audio-rate oscillator with sine, saw, square, and triangle waveforms.</div>
+<div><a href="reference.html#polyblep-h">polyblep.h</a> — PolyBLEP corrections: the standard trick for alias-free jumps.</div>
+<div><a href="reference.html#sineoscillator">SineOscillator</a>, <a href="reference.html#cosineoscillator">CosineOscillator</a> — Table sine oscillator and the recursive cosine oscillator.</div>
+<div><a href="reference.html#stringsynthoscillator">StringSynthOscillator</a> — Divide-down string-machine oscillator from Plaits.</div>
+<div><a href="reference.html#variableshapeoscillator">VariableShapeOscillator</a> — Plaits&#x27; morphing triangle-saw-square oscillator with hard sync.</div>
+<div><a href="reference.html#vosimoscillator">VosimOscillator</a> — VOSIM (&quot;VOice SIMulation&quot;) oscillator from Plaits.</div>
+<div><a href="reference.html#zoscillator">ZOscillator</a> — Plaits&#x27; Z oscillator: Casio CZ-style &quot;resonance&quot; waveforms.</div>
+</div>
+<h3>Noise</h3><div class="catalogue">
+<div><a href="reference.html#clockednoise">ClockedNoise</a> — Band-limited sample-and-hold noise, from Plaits.</div>
+<div><a href="reference.html#dust">Dust</a> — Sparse random impulses (&quot;crackle&quot;), from Plaits.</div>
+<div><a href="reference.html#whitenoise">WhiteNoise</a>, <a href="reference.html#pinknoise">PinkNoise</a> — White and pink noise generators for the BuddhaBox DSP framework.</div>
+<div><a href="reference.html#particle">Particle</a> — Randomly pitched resonant pings, from Plaits&#x27; particle engine.</div>
+<div><a href="reference.html#smoothrandom">SmoothRandom</a> — A smoothly wandering random signal (a random LFO), from Plaits.</div>
+</div>
+<h3>Filters</h3><div class="catalogue">
+<div><a href="reference.html#allpassfilter">AllpassFilter</a> — Schroeder allpass filter for phase dispersion and reverb diffusion.</div>
+<div><a href="reference.html#dcblocker">DcBlocker</a> — Removes DC offset and sub-audio drift.</div>
+<div><a href="reference.html#hilbert">Hilbert</a> — Hilbert transformer: two outputs 90 degrees apart (Warps).</div>
+<div><a href="reference.html#moogfilter">MoogFilter</a> — 4-pole Moog ladder filter approximation with resonance.</div>
+<div><a href="reference.html#onepoleout">OnePoleOut</a>, <a href="reference.html#onepole">OnePole</a> — Zero-delay-feedback one-pole low-pass / high-pass filter.</div>
+<div><a href="reference.html#svfilter">SVFilter</a> — State Variable Filter (SVF) with simultaneous low/high/bandpass</div>
+<div><a href="reference.html#svfout">SvfOut</a>, <a href="reference.html#svf">Svf</a> — Zero-delay-feedback state-variable filter (stmlib&#x27;s Svf).</div>
+<div><a href="reference.html#vowelfilter">VowelFilter</a> — A &quot;talking&quot; filter: five formant band-passes, from Plaits.</div>
+</div>
+<h3>Modulation</h3><div class="catalogue">
+<div><a href="reference.html#bouncingball">BouncingBall</a> — An envelope that falls and bounces like a dropped ball (Peaks).</div>
+<div><a href="reference.html#tempoclock">TempoClock</a> — Sample-accurate tempo clock for synchronizing events and sequencing.</div>
+<div><a href="reference.html#clocktoramp">ClockToRamp</a> — Turns a clock into a smooth phase ramp (Tides 2 / Marbles).</div>
+<div><a href="reference.html#colour">Colour</a> — Five-note just-intonation scales (&quot;colours&quot;) plus a melody maker.</div>
+<div><a href="reference.html#envelope">Envelope</a> — Attack-Release (AR) envelope generator for shaping amplitude over</div>
+<div><a href="reference.html#hysteresisquantizer">HysteresisQuantizer</a> — Turns a 0..1 knob into N steps without flicker at the edges.</div>
+<div><a href="reference.html#lag">Lag</a> — Clock-synchronised glide between steps: Marbles&#x27; &quot;steps&quot; control.</div>
+<div><a href="reference.html#lorenz">Lorenz</a> — Lorenz attractor: a chaotic, never-repeating modulation source.</div>
+<div><a href="reference.html#quantizer">Quantizer</a> — Weighted scale quantizer from Marbles.</div>
+<div><a href="reference.html#randomsequence">RandomSequence</a> — Random values that can loop: Marbles&#x27; &quot;déjà vu&quot; control.</div>
+<div><a href="reference.html#sampleandhold">SampleAndHold</a> — Sample and Hold — captures and freezes an input on a trigger.</div>
+<div><a href="reference.html#segmentenvelope">SegmentEnvelope</a> — Peaks&#x27; multi-segment envelope: ADSR, AD, AR, looping, or custom.</div>
+<div><a href="reference.html#slewlimiter">SlewLimiter</a> — Slew limiter with independent rise and fall times.</div>
+<div><a href="reference.html#slope">Slope</a> — Tides 2 function generator: envelope, LFO or oscillator.</div>
+</div>
+<h3>Dynamics</h3><div class="catalogue">
+<div><a href="reference.html#compressor">Compressor</a> — RMS feed-forward compressor with sidechain, from Streams.</div>
+<div><a href="reference.html#follower">Follower</a> — Envelope follower that also tracks brightness (Rings).</div>
+<div><a href="reference.html#lowpassgate">LowPassGate</a> — Low Pass Gate (LPG) — combined VCA and lowpass filter on one CV.</div>
+<div><a href="reference.html#vactrol">Vactrol</a> — Detailed vactrol model from Streams: control in, gain + cutoff out.</div>
+<div><a href="reference.html#vactrollpg">VactrolLpg</a> — Plaits&#x27; low-pass gate with its vactrol envelope.</div>
+</div>
+<h3>Effects</h3><div class="catalogue">
+<div><a href="reference.html#chorus">Chorus</a> — Rings&#x27; stereo chorus: gentle, slow and wide.</div>
+<div><a href="reference.html#decimator">Decimator</a> — Anti-aliased sample-rate reducer from Plaits.</div>
+<div><a href="reference.html#delayline">DelayLine</a> — Delay line with interpolated reads for echo, chorus, and</div>
+<div><a href="reference.html#diffuser">Diffuser</a> — Clouds&#x27; stereo diffuser: four all-passes per channel.</div>
+<div><a href="reference.html#ensemble">Ensemble</a> — Rings&#x27; string-machine ensemble: a lush, shimmering chorus.</div>
+<div><a href="reference.html#fxengine">FxEngine</a> — Toolkit for delay-based effects (Clouds/Rings/Elements FxEngine).</div>
+<div><a href="reference.html#limiter">Limiter</a> — Smooth output limiter from Rings and Warps.</div>
+<div><a href="reference.html#overdrive">Overdrive</a> — Level-compensated soft-clipping overdrive from Plaits.</div>
+<div><a href="reference.html#pitchshifter">PitchShifter</a> — Clouds&#x27; delay-line pitch shifter.</div>
+<div><a href="reference.html#reverb">Reverb</a> — Stereo plate-style reverb from Rings, Elements and Clouds.</div>
+<div><a href="reference.html#tablewavefolder">TableWavefolder</a> — Plaits&#x27; table wavefolder: sine fold and analog-circuit fold.</div>
+<div><a href="reference.html#wavefolder">WaveFolder</a> — Single-stage wave folder for west-coast/Buchla-style synthesis.</div>
+</div>
+<h3>Physical models</h3><div class="catalogue">
+<div><a href="reference.html#karplusstrong">KarplusStrong</a> — Karplus-Strong plucked string synthesis.</div>
+<div><a href="reference.html#modalresonator">ModalResonator</a> — Rings&#x27; modal resonator: struck or bowed strings, bars and bells.</div>
+<div><a href="reference.html#plucker">Plucker</a> — Rings&#x27; pick/finger exciter for StringModel and ModalResonator.</div>
+<div><a href="reference.html#stringmodel">StringModel</a> — Elements&#x27; string: Karplus-Strong with dispersion and a buzzing</div>
+<div><a href="reference.html#tube">Tube</a> — Elements&#x27; reed-and-tube wind model.</div>
+</div>
+<h3>Drums</h3><div class="catalogue">
+<div><a href="reference.html#analogkick">AnalogKick</a> — TR-808 bass drum circuit model, from Plaits.</div>
+<div><a href="reference.html#analogsnare">AnalogSnare</a> — TR-808 snare drum circuit model (extended), from Plaits.</div>
+<div><a href="reference.html#fmdrum">FmDrum</a> — Peaks&#x27; FM drum: sine drum with pitch envelopes, noise and drive.</div>
+<div><a href="reference.html#hihat">HiHat</a> — TR-808 hi-hat, plus a ring-modulated variant, from Plaits.</div>
+<div><a href="reference.html#synthkick">SynthKick</a> — TR-909-style digital kick, from Plaits.</div>
+<div><a href="reference.html#synthsnare">SynthSnare</a> — TR-909 snare drum model, from Plaits.</div>
+</div>
+<h3>Spectral</h3><div class="catalogue">
+<div><a href="reference.html#fmoperators">FmOperators</a> — DX-style 4- or 6-operator FM voice (Plaits&#x27; FM engine).</div>
+<div><a href="reference.html#xmod">Xmod</a> — Warps&#x27; cross-modulation algorithms for combining two signals.</div>
+</div>
+<h3>Inputs and outputs</h3><div class="catalogue">
+<div><a href="reference.html#analoginput">AnalogInput</a> — Smoothed analog input reader for external sensors.</div>
+<div><a href="reference.html#userled">UserLED</a> — Driver for the onboard user LED (PC13) on the Black Pill.</div>
+<div><a href="reference.html#matrixkeypad">MatrixKeypad</a> — 5×5 diode matrix keypad — debounced input with per-key</div>
+<div><a href="reference.html#mpr121input">MPR121Input</a> — MPR121 capacitive touch controller — standalone I2C driver</div>
+<div><a href="reference.html#muxinput">MuxInput</a> — CD74HC4067 16-channel analog multiplexer driver.</div>
+<div><a href="reference.html#switchinput">SwitchInput</a> — Debounced digital switch input with trigger/hold/release detection.</div>
+</div>
+<!-- /CATALOGUE -->
+</section>
+
+</div>
+<footer>BuddhaBox framework. Modules derived from Mutable Instruments
+firmware are Copyright Emilie Gillet, MIT licence.</footer>
+</body>
+</html>
