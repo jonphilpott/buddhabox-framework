@@ -358,7 +358,12 @@ void setup() {
 <p>You MUST define this function in your main.cpp. It&#x27;s called automatically by the DMA interrupt handler twice per audio block cycle (once for each half of the double buffer).</p>
 <div class="method-param">Param <code>buffer</code> — Pointer to the buffer half to fill with audio data. Format: stereo interleaved 16-bit samples [L, R, L, R, ...] Each sample ranges from -32768 to +32767. To convert from float: (int16_t)(floatSample * 32000.0f) (We use 32000 instead of 32767 to leave a tiny bit of headroom)</div>
 <div class="method-param">Param <code>length</code> — Number of int16_t values to fill (= frames * 2 for stereo). With AUDIO_BLOCK_SIZE=256, length will be 512. IMPORTANT: This runs in interrupt context! Keep it fast: - No Serial.print() or other I/O - No analogRead() (too slow) - No dynamic memory allocation (malloc/new) - Keep computations minimal and predictable</div></div></div>
-<div class="method-block"><div class="method-sig">void begin()</div><div class="method-desc"><p>Initialize I2S + DMA and begin audio playback. Call once in setup().</p></div></div>
+<div class="method-block"><div class="method-sig">namespace bb</div><div class="method-desc"><h5>Overrun Led</h5>
+<p>when an audioCallback() takes longer than the DAC takes to play one block, the engine lights the Black Pill&#x27;s blue LED (PC13) and leaves it on until reset. Above 100% CPU the audio interrupt runs back to back and loop() never runs, so a serial print can&#x27;t report the problem; the LED needs nothing from loop().</p>
+<p>It&#x27;s on by default. To turn it off, for example to use PC13 yourself or with UserLED (io/led.h), which drives the same pin, add this to platformio.ini:</p>
+<p>build_flags = ... -D BB_OVERRUN_LED=0</p>
+<p>A build flag rather than a function call: when it&#x27;s 0, the engine never touches the pin at all, not even to set it up.</p></div></div>
+<div class="method-block"><div class="method-sig">void begin()</div><div class="method-desc"><p>Initialize I2S + DMA and begin audio playback. Call once in setup(). Also sets up the overrun LED unless BB_OVERRUN_LED is 0.</p></div></div>
 <div class="method-block"><div class="method-sig">float cpuLoad()</div><div class="method-desc"><p>How much of the CPU the last audioCallback() used.</p>
 <p>Measured with the Cortex-M4&#x27;s cycle counter around each callback. Use it to find out whether a patch fits: keep it below about 0.8 to leave room for loop() and the USB serial port.</p>
 <p class="example-label">Example:</p>
@@ -3338,6 +3343,7 @@ void loop() {
 <h4>UserLED</h4>
 <div class="method-sig">class UserLED</div>
 <p>Driver for the onboard user LED (PC13) on the Black Pill.</p>
+<p>The audio engine also uses this LED, to show a CPU overrun. To use UserLED, turn that off with -D BB_OVERRUN_LED=0 in build_flags (see audio_engine.h), or the two will fight over the pin.</p>
 <p>See the file header above for how it works and usage examples.</p>
 <p class="example-label">Instantiation</p><pre><code>UserLED name;</code></pre>
 <div class="method-block"><div class="method-sig">UserLED()</div><div class="method-desc"><p>Construct a UserLED object.</p>

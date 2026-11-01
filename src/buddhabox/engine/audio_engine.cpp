@@ -76,7 +76,11 @@ static DMA_HandleTypeDef hdma_i2s2_tx;
 static volatile uint32_t lastCycles = 0;
 static volatile uint32_t peakCycles = 0; // worst since cpuPeak() last ran
 
-/** Run the user's callback and time it. */
+// Cycles in one block, set in begin(): an integer so the interrupt can
+// compare against it without any float maths.
+static uint32_t blockCycles = 0xFFFFFFFFu;
+
+/** Run the user's callback, time it, and flag an overrun. */
 static void runCallback(int16_t *buffer) {
   uint32_t start = DWT->CYCCNT;
   audioCallback(buffer, AUDIO_BLOCK_SIZE * 2);
@@ -84,6 +88,16 @@ static void runCallback(int16_t *buffer) {
   lastCycles = cycles;
   if (cycles > peakCycles)
     peakCycles = cycles;
+#if BB_OVERRUN_LED
+  // The block took longer than the DAC took to play one: light the LED
+  // (active-low: LOW is on). Written once, so a patch that overruns
+  // every block doesn't pay for a digitalWrite() each time.
+  static bool lit = false;
+  if (!lit && cycles > blockCycles) {
+    lit = true;
+    digitalWrite(LED_BUILTIN, LOW);
+  }
+#endif
 }
 
 /** Cycles available per block: CPU clock / sample rate * frames. */
@@ -148,6 +162,13 @@ void begin() {
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk; // enable DWT unit
   DWT->CYCCNT = 0;
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+  blockCycles = (uint32_t)cyclesPerBlock();
+
+#if BB_OVERRUN_LED
+  // ── Step 0a: Overrun LED, off until a block runs late ──────────────
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH); // active-low: HIGH is off
+#endif
 
   // ── Step 0b: Configure I2S Clock (PLLI2S) ──────────────────────────
   // Essential for the I2S peripheral to drive its internal bit clock.

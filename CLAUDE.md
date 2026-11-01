@@ -26,6 +26,8 @@ The project has an educational focus: highly documented code and a
 - **Serial Monitor:** `pio device monitor` (examples print `AudioEngine::cpuLoad()`)
 - **Measure CPU:** `pio run -e profile -t upload` prints cycles per sample per module
   (works even when a patch is over budget)
+- **Overrun LED:** the engine lights the blue LED (PC13) when a block runs
+  late; `-D BB_OVERRUN_LED=0` turns it off (needed with `UserLED`)
 - **Build flags:** keep `build_unflags = -Os`; the STM32 core appends `-Os`,
   which otherwise overrides `-O2`
 - **Port check:** `clang++ -std=c++14 -O2 -I src -I ../partials/include tests/compare_partials.cpp -o /tmp/compare && /tmp/compare`

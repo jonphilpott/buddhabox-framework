@@ -181,9 +181,12 @@ with the Cortex-M4's cycle counter. Keep it below about 0.8.
 <code>AudioEngine::cpuPeak()</code> gives the worst block since its last
 call, which catches spikes a once-a-second print would miss. Above 1.0
 the audio clicks, and <code>loop()</code> stops running altogether, so
-nothing gets printed: run the <code>profile</code> example to see where
-the cycles go. The <code>singing_bowls</code> example therefore
-also lights the Black Pill's blue LED (PC13) when a block runs late.</div>
+nothing gets printed. So the engine lights the Black Pill's <strong>blue
+LED</strong> (PC13) the first time a block runs late, and leaves it on
+until reset; run the <code>profile</code> example to see where the cycles
+go. To turn the LED off, for example to use PC13 yourself or with
+<code>UserLED</code>, which drives the same pin, add
+<code>-D BB_OVERRUN_LED=0</code> to <code>build_flags</code>.</div>
 </section>
 
 <!-- ───────────────────────────────────────────────────────────────── -->

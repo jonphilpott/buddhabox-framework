@@ -40,6 +40,10 @@ namespace bb {
 /**
  * Driver for the onboard user LED (PC13) on the Black Pill.
  *
+ * The audio engine also uses this LED, to show a CPU overrun. To use
+ * UserLED, turn that off with -D BB_OVERRUN_LED=0 in build_flags (see
+ * audio_engine.h), or the two will fight over the pin.
+ *
  * See the file header above for how it works and usage examples.
  */
 class UserLED {

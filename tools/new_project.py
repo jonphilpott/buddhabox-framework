@@ -50,6 +50,8 @@ build_flags =
     -O2
     -D PIO_FRAMEWORK_ARDUINO_ENABLE_CDC
     -D USBCON
+;   -D BB_OVERRUN_LED=0   ; frees the blue LED (PC13) from the CPU overrun
+;                         ; indicator, e.g. to use UserLED
 lib_deps =
     symlink://{framework}
 """

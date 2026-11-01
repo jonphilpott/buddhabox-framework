@@ -91,10 +91,33 @@
  */
 extern void audioCallback(int16_t *buffer, uint16_t length);
 
+/**
+ * OVERRUN LED: when an audioCallback() takes longer than the DAC takes to
+ * play one block, the engine lights the Black Pill's blue LED (PC13) and
+ * leaves it on until reset. Above 100% CPU the audio interrupt runs back
+ * to back and loop() never runs, so a serial print can't report the
+ * problem; the LED needs nothing from loop().
+ *
+ * It's on by default. To turn it off, for example to use PC13 yourself
+ * or with UserLED (io/led.h), which drives the same pin, add this to
+ * platformio.ini:
+ *
+ *   build_flags = ... -D BB_OVERRUN_LED=0
+ *
+ * A build flag rather than a function call: when it's 0, the engine
+ * never touches the pin at all, not even to set it up.
+ */
+#ifndef BB_OVERRUN_LED
+#define BB_OVERRUN_LED 1
+#endif
+
 namespace bb {
 
 namespace AudioEngine {
-/** Initialize I2S + DMA and begin audio playback. Call once in setup(). */
+/**
+ * Initialize I2S + DMA and begin audio playback. Call once in setup().
+ * Also sets up the overrun LED unless BB_OVERRUN_LED is 0.
+ */
 void begin();
 
 /**

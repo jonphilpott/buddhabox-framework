@@ -68,7 +68,8 @@ void loop() {}
 
 - `pio run` — build every example
 - `pio run -e singing_bowls -t upload` — flash one (DFU: hold BOOT0, tap NRST)
-- `pio device monitor` — the examples print their CPU load
+- `pio device monitor` — the examples print their CPU load; the blue LED
+  lights if the audio ever overruns (`-D BB_OVERRUN_LED=0` turns that off)
 - `pio run -e profile -t upload` — measure each module's cycles per sample
 - `python3 tools/new_project.py ../my_synth` — start a new project
 - `python3 tools/gen_docs.py` — regenerate the reference after editing docstrings

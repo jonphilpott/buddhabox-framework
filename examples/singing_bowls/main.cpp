@@ -21,8 +21,8 @@
  *   moves across the stereo field.
  *
  * RAM: about 41 KB (32 KB of it is the reverb). The serial monitor prints
- * the measured CPU load once a second; the blue LED lights if a block
- * ever runs late.
+ * the measured CPU load once a second; the engine lights the blue LED
+ * if a block ever runs late.
  *
  * CPU: about 75%, measured with the profile example: the 12-mode bowl
  * is about 700 cycles per sample and the reverb about 480, of 1905.
@@ -81,13 +81,6 @@ void controlUpdate() {
  * @param length  Number of int16 values (frames * 2)
  */
 void audioCallback(int16_t *buffer, uint16_t length) {
-  // Overrun warning that needs no serial port: if the last block took
-  // longer than the DAC took to play one, light the Black Pill's blue
-  // LED (PC13, lit when LOW) and leave it on. Above 100% the interrupt
-  // runs back to back, so loop() and its prints never get a turn.
-  if (AudioEngine::cpuLoad() > 1.0f)
-    digitalWrite(LED_BUILTIN, LOW);
-
   for (uint16_t i = 0; i < length; i += 2) {
     // 1. Slow modulation.
     chaos.process();
@@ -140,9 +133,7 @@ void setup() {
   reverb.setAmount(0.45f);
   reverb.setLp(0.6f);
 
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH); // off: the LED is wired active-low
-  Serial.begin(115200);            // USB serial, for the CPU meter below
+  Serial.begin(115200); // USB serial, for the CPU meter below
   AudioEngine::begin();
 }
 
