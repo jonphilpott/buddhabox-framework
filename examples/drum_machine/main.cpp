@@ -101,6 +101,8 @@ void setup() {
 void loop() {
   Serial.print("CPU: ");
   Serial.print(AudioEngine::cpuLoad() * 100.0f, 1);
+  Serial.print("%  peak: ");
+  Serial.print(AudioEngine::cpuPeak() * 100.0f, 1);
   Serial.println("%");
   delay(1000);
 }

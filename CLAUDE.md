@@ -21,9 +21,13 @@ The project has an educational focus: highly documented code and a
 ## Building and Running
 - **Build every example:** `pio run`
 - **Build one:** `pio run -e singing_bowls` (envs: minimal, singing_bowls,
-  drum_machine, custom_voice, compile_all)
+  drum_machine, custom_voice, compile_all, profile)
 - **Upload:** `pio run -e <env> -t upload` (DFU: hold BOOT0, tap NRST, release BOOT0)
 - **Serial Monitor:** `pio device monitor` (examples print `AudioEngine::cpuLoad()`)
+- **Measure CPU:** `pio run -e profile -t upload` prints cycles per sample per module
+  (works even when a patch is over budget)
+- **Build flags:** keep `build_unflags = -Os`; the STM32 core appends `-Os`,
+  which otherwise overrides `-O2`
 - **Port check:** `clang++ -std=c++14 -O2 -I src -I ../partials/include tests/compare_partials.cpp -o /tmp/compare && /tmp/compare`
 - **New project:** `python3 tools/new_project.py ../my_synth [--example custom_voice]`
 - **Regenerate tables:** see `tools/gen_tables.cpp` header

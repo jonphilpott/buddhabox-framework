@@ -4,13 +4,11 @@
  *
  * A generative ambient patch built from the Mutable Instruments ports:
  *
- *   Dust ──► ModalResonator (bowl) ──┐
- *   Particle (droplets) ─────────────┼─► mix ─► Hilbert frequency shift
- *   StringSynthOscillator (drone) ───┘            │
- *                                                 ▼
- *          Lorenz ──► modulates bowl structure, drone filter, shift
- *                                                 │
- *                                   Reverb ◄──────┘ ─► Limiter ─► DAC
+ *   Dust ──► ModalResonator (bowl) ──┐   (stereo from the bowl's side)
+ *   Particle (droplets) ─────────────┼─► mix ─► Reverb ─► Limiter ─► DAC
+ *   StringSynthOscillator (drone) ───┘
+ *
+ *          Lorenz ──► modulates bowl structure, brightness, drone filter
  *
  * - Dust strikes the bowl at random, a few times a minute.
  * - Particle adds sparse, glassy pings around the bowl's pitch.
@@ -18,25 +16,29 @@
  *   low-pass.
  * - A Lorenz attractor wanders the bowl's inharmonicity and the drone's
  *   brightness, so the patch never quite repeats.
- * - A Hilbert frequency shifter detunes everything by a fraction of a Hz,
- *   which makes the reverb tail beat and swirl.
+ * - The bowl's side() output, a second pickup swept by a slow LFO, is
+ *   added to one channel and subtracted from the other, so the bowl
+ *   moves across the stereo field.
  *
  * RAM: about 41 KB (32 KB of it is the reverb). The serial monitor prints
- * the measured CPU load once a second.
+ * the measured CPU load once a second; the blue LED lights if a block
+ * ever runs late.
+ *
+ * CPU: about 75%, measured with the profile example: the 12-mode bowl
+ * is about 700 cycles per sample and the reverb about 480, of 1905.
+ * Each extra mode costs about 48 cycles.
  */
 
 #include <Arduino.h>
 
 #include "buddhabox/core/dsp_common.h"
 #include "buddhabox/engine/audio_engine.h"
-#include "buddhabox/filter/hilbert.h"
 #include "buddhabox/filter/svf.h"
 #include "buddhabox/fx/limiter.h"
 #include "buddhabox/fx/reverb.h"
 #include "buddhabox/mod/lorenz.h"
 #include "buddhabox/noise/dust.h"
 #include "buddhabox/noise/particle.h"
-#include "buddhabox/osc/sine.h"
 #include "buddhabox/osc/string_synth.h"
 #include "buddhabox/physical/modal_resonator.h"
 
@@ -51,15 +53,16 @@ Svf droneFilter;
 
 // ── Modulation and effects ──────────────────────────────────────────────
 Lorenz chaos;
-Hilbert hilbert;
-SineOscillator shifter; // quadrature carrier for the frequency shift
-Reverb<> reverb;        // 32 KB
+Reverb<> reverb; // 32 KB
 Limiter limiter;
 
 // Control-rate work runs every kControlPeriod samples (about 1.4 kHz),
 // which keeps per-sample cost down.
 const int kControlPeriod = 32;
 int controlCounter = 0;
+
+// The bowl's level in the mix (its centre and side outputs alike).
+const float kBowlGain = 3.5f;
 
 /**
  * Update slow-moving parameters from the Lorenz attractor.
@@ -78,6 +81,13 @@ void controlUpdate() {
  * @param length  Number of int16 values (frames * 2)
  */
 void audioCallback(int16_t *buffer, uint16_t length) {
+  // Overrun warning that needs no serial port: if the last block took
+  // longer than the DAC took to play one, light the Black Pill's blue
+  // LED (PC13, lit when LOW) and leave it on. Above 100% the interrupt
+  // runs back to back, so loop() and its prints never get a turn.
+  if (AudioEngine::cpuLoad() > 1.0f)
+    digitalWrite(LED_BUILTIN, LOW);
+
   for (uint16_t i = 0; i < length; i += 2) {
     // 1. Slow modulation.
     chaos.process();
@@ -87,19 +97,20 @@ void audioCallback(int16_t *buffer, uint16_t length) {
     }
 
     // 2. Sources: the struck bowl, the droplets, the filtered drone.
-    float bowlOut = bowl.process(striker.process());
+    //    Gains set from a host simulation of two minutes of the patch: a
+    //    full strike peaks near 0.5, droplets near 0.17, and the drone
+    //    sits about 8 dB below the bowl's average level. The bowl needs
+    //    a big gain because a one-sample strike puts little energy in.
+    float bowlOut = bowl.process(striker.process()) * kBowlGain;
     float drops = droplets.process() * 0.3f;
-    float droneOut = droneFilter.process(drone.process()).lp * 0.15f;
-    float mix = bowlOut * 0.5f + drops + droneOut;
+    float droneOut = droneFilter.process(drone.process()).lp * 0.06f;
+    float mix = bowlOut + drops + droneOut;
 
-    // 3. Frequency shift by ~0.3 Hz: I*cos - Q*sin moves every partial up.
-    float s, c;
-    hilbert.process(mix);
-    shifter.next((0.3f + 0.2f * chaos.y()) / SAMPLE_RATE, 1.0f, s, c);
-    float shifted = hilbert.i() * c - hilbert.q() * s;
-
-    // 4. Stereo: dry mix left, shifted copy right, then reverb.
-    float left = mix, right = shifted;
+    // 3. Stereo: the bowl's side signal (a moving second pickup minus the
+    // main one) widens it: (centre + side, centre - side). It comes free
+    // with the resonator, which computes it anyway.
+    float width = bowl.side() * kBowlGain;
+    float left = mix + width, right = mix - width;
     reverb.process(left, right);
     limiter.process(left, right);
 
@@ -110,7 +121,7 @@ void audioCallback(int16_t *buffer, uint16_t length) {
 
 void setup() {
   bowl.setFrequency(146.8f); // D3
-  bowl.setModes(16);
+  bowl.setModes(12);         // 16 modes would push the patch to about 85%
   bowl.setDamping(0.85f);
   bowl.setPosition(0.3f);
   striker.setDensity(0.08f); // about five strikes a minute
@@ -125,11 +136,13 @@ void setup() {
 
   chaos.setRate(0.05f); // very slow drift
 
-  reverb.setTime(0.9f);
+  reverb.setTime(0.99f);
   reverb.setAmount(0.45f);
   reverb.setLp(0.6f);
 
-  Serial.begin(115200); // USB serial, for the CPU meter below
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH); // off: the LED is wired active-low
+  Serial.begin(115200);            // USB serial, for the CPU meter below
   AudioEngine::begin();
 }
 
@@ -140,6 +153,8 @@ void setup() {
 void loop() {
   Serial.print("CPU: ");
   Serial.print(AudioEngine::cpuLoad() * 100.0f, 1);
+  Serial.print("%  peak: ");
+  Serial.print(AudioEngine::cpuPeak() * 100.0f, 1);
   Serial.println("%");
   delay(1000);
 }

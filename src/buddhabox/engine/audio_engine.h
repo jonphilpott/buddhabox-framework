@@ -114,6 +114,23 @@ void begin();
  *   }
  */
 float cpuLoad();
+
+/**
+ * The highest load of any audioCallback() since the last call to
+ * cpuPeak(), then reset.
+ *
+ * cpuLoad() shows only the latest block, so a print once a second can
+ * miss a short spike. A spike above 1.0 is a click; the peak catches it.
+ *
+ * @return  The same scale as cpuLoad(): above 1.0 a block was late
+ *
+ * Example:
+ *   void loop() {
+ *     Serial.println(AudioEngine::cpuPeak() * 100.0f); // worst, percent
+ *     delay(1000);
+ *   }
+ */
+float cpuPeak();
 } // namespace AudioEngine
 
 } // namespace bb

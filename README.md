@@ -27,6 +27,7 @@ platform = ststm32@15.4.1
 board = blackpill_f401cc
 framework = arduino
 upload_protocol = dfu
+build_unflags = -Os   ; the core adds it after -O2, and it wins
 build_flags = -O2 -D PIO_FRAMEWORK_ARDUINO_ENABLE_CDC -D USBCON
 lib_deps = symlink://../buddhabox-framework
 ```
@@ -57,7 +58,7 @@ void loop() {}
   `filter`, `mod`, `dynamics`, `fx`, `physical`, `drums`, `spectral`
 - `src/buddhabox.h` — includes everything
 - `examples/` — `minimal`, `singing_bowls`, `drum_machine`, `custom_voice`,
-  `compile_all` (each is a `pio run -e <name>` environment)
+  `compile_all`, `profile` (each is a `pio run -e <name>` environment)
 - `docs/index.html` — guide: wiring, conventions, budgets, composition
 - `docs/reference.html` — full API, generated from the docstrings
 - `tests/compare_partials.cpp` — checks every port against Partials
@@ -68,6 +69,7 @@ void loop() {}
 - `pio run` — build every example
 - `pio run -e singing_bowls -t upload` — flash one (DFU: hold BOOT0, tap NRST)
 - `pio device monitor` — the examples print their CPU load
+- `pio run -e profile -t upload` — measure each module's cycles per sample
 - `python3 tools/new_project.py ../my_synth` — start a new project
 - `python3 tools/gen_docs.py` — regenerate the reference after editing docstrings
 

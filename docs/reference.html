@@ -367,6 +367,14 @@ void setup() {
   delay(500);
 }</code></pre>
 <div class="method-returns">Returns: 0.0 (idle) to 1.0 (fully loaded); above 1.0 the callback is too slow and the audio will drop out</div></div></div>
+<div class="method-block"><div class="method-sig">float cpuPeak()</div><div class="method-desc"><p>The highest load of any audioCallback() since the last call to cpuPeak(), then reset.</p>
+<p>cpuLoad() shows only the latest block, so a print once a second can miss a short spike. A spike above 1.0 is a click; the peak catches it.</p>
+<p class="example-label">Example:</p>
+<pre><code>void loop() {
+  Serial.println(AudioEngine::cpuPeak() * 100.0f); // worst, percent
+  delay(1000);
+}</code></pre>
+<div class="method-returns">Returns: The same scale as cpuLoad(): above 1.0 a block was late</div></div></div>
 </section>
 <section id="osc"><h2>Oscillators</h2><p>Pitched sound sources.</p>
 <h3 id="basic-h">basic.h</h3>
@@ -913,6 +921,7 @@ float sample = pink.process(); // Returns pink noise in [-1, +1]</code></pre>
 <h5>How It Works</h5>
 <p>each sample, a random number decides whether an impulse fires (probability = density / sample rate). When one does, the band-pass filter is retuned to the centre frequency shifted randomly by up to ±spread semitones, and the impulse rings it. The level is compensated for the filter&#x27;s Q and the density, so the output stays at a steady loudness.</p>
 <p>Difference from Plaits: Plaits retunes the filter at most once per 12-sample block; this version retunes on every impulse.</p>
+<p>The impulse: one fires when the random number u is below the density, so u itself is never bigger than the density. Plaits scales it by 1 / density (its engine&#x27;s <code>gain</code>) to span 0..1. Partials once dropped that, which left sparse particles inaudible (at 1 Hz, every impulse was below 0.00003); both are now fixed.</p>
 <p>Derived from Plaits, Copyright 2016 Emilie Gillet. MIT licence.</p>
 <div class="module-card" id="particle">
 <h4>Particle</h4>
@@ -1066,7 +1075,7 @@ float out = dc.process(softclip(in * 4.0f));</code></pre>
 <p>two chains of first-order all-pass filters. All-passes change only phase, not level. The chains are designed so their phase responses stay 90 degrees apart (within about 1 degree) from 10 Hz to 20 kHz. The design is an elliptic half-band filter decomposed into all-passes (as in Warps&#x27; resource script), computed for the actual sample rate when the object is built.</p>
 <p>Both outputs are delayed, phase-shifted versions of the input, so use I and Q together, not I as a stand-in for the input.</p>
 <h5>Cost</h5>
-<p>17 first-order all-passes, roughly 70 cycles per sample (estimate).</p>
+<p>17 first-order all-passes, 235 cycles per sample (12% of the Black Pill), measured with the profile example.</p>
 <p>Derived from Warps, Copyright 2014 Emilie Gillet. MIT licence.</p>
 <div class="module-card" id="hilbert">
 <h4>Hilbert</h4>
@@ -2771,7 +2780,7 @@ int16_t out = (int16_t)(sample * 32000.0f);</code></pre>
 <p>The sound of a struck or bowed object (string, bar, plate, bell, glass) made by summing resonant band-pass filters, one per vibration &quot;mode&quot;. Feed it a short burst (a click, noise, a pluck, Dust) and it rings. Singing bowls, gamelan, wind chimes: this is the ambient workhorse.</p>
 <h5>How It Works</h5>
 <ul><li>Each mode is an Svf band-pass tuned to one partial. Partial k sits at k * frequency * stretch, where the stretch grows with <code>structure</code>: none for a harmonic string, more for stiff bars, compressed for bells.</li><li>Each mode&#x27;s Q sets how long it rings. Higher partials lose Q faster (<code>brightness</code> controls how fast), which is how real objects behave.</li><li><code>position</code> imitates where the object is struck: mode k is weighted by 0.5 + 0.5*cos(2*pi*k*position). That is a comb filter applied directly to the mode gains instead of to the audio, which avoids flanging when position is modulated.</li><li>With bowed modes on, the first 8 modes also get a delay-line loop driven by a nonlinear &quot;bow table&quot; (Elements&#x27; banded waveguides), so a continuous bow pressure gives a sustained, scratchy tone.</li></ul>
-<p>COST ON THE BLACK PILL (84 MHz, ~1900 cycles per sample in total), an estimate from the instruction count — measure your patch with AudioEngine::cpuLoad(): about 20 cycles per mode per sample, plus filter updates at 2 kHz. The default of 24 modes should take roughly a quarter of the CPU; setModes(16) is plenty for bells and bowls, 32+ for bright metallic sounds. Rings runs up to 64 on a 168 MHz chip.</p>
+<p>COST ON THE BLACK PILL (84 MHz, 1905 cycles per sample in total), measured with the profile example: about 127 cycles plus 48 per mode per sample, filter updates included. 8 modes take 511 cycles (27% of the CPU), 16 take 894 (47%) and the default 24 take 1282 (67%), so call setModes(): 12-16 is plenty for bells and bowls. Rings runs up to 64 modes, but on a 168 MHz chip.</p>
 <h5>Memory</h5>
 <p>the template parameter sizes the bowed-mode delay lines (8 of them, 4 bytes per sample each). 0 (the default) disables bowing and costs nothing. They hold float, not int16_t: the bowed signal is tiny (around 0.01) and the loop resonates strongly, so 16-bit storage would leave it only ~8 bits of resolution and audibly change the tone.</p>
 <ul><li>ModalResonator&lt;512&gt;   16 KB; notes below ~86 Hz fold up an octave</li><li>ModalResonator&lt;1024&gt;  32 KB; notes below ~43 Hz fold up an octave</li></ul>

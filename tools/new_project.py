@@ -43,6 +43,9 @@ platform = ststm32@15.4.1
 board = blackpill_f401cc
 framework = arduino
 upload_protocol = dfu
+; The STM32 core adds -Os after build_flags and GCC obeys the last -O,
+; so remove it or -O2 is silently ignored.
+build_unflags = -Os
 build_flags =
     -O2
     -D PIO_FRAMEWORK_ARDUINO_ENABLE_CDC

@@ -17,6 +17,12 @@
  * Difference from Plaits: Plaits retunes the filter at most once per
  * 12-sample block; this version retunes on every impulse.
  *
+ * The impulse: one fires when the random number u is below the density,
+ * so u itself is never bigger than the density. Plaits scales it by
+ * 1 / density (its engine's `gain`) to span 0..1. Partials once dropped
+ * that, which left sparse particles inaudible (at 1 Hz, every impulse
+ * was below 0.00003); both are now fixed.
+ *
  * Derived from Plaits, Copyright 2016 Emilie Gillet. MIT licence.
  */
 
@@ -89,7 +95,7 @@ public:
     }
     float s = 0.0f;
     if (u <= density_) {
-      s = u;
+      s = u / density_; // 0..1 (u is never bigger than density_)
       // A new random pitch for this particle. The gain compensates the
       // filter's Q and the density (Plaits' formula, written against
       // 48 kHz, hence the f48 / density48 terms).

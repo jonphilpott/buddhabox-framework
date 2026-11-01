@@ -21,13 +21,12 @@
  *   driven by a nonlinear "bow table" (Elements' banded waveguides), so a
  *   continuous bow pressure gives a sustained, scratchy tone.
  *
- * COST ON THE BLACK PILL (84 MHz, ~1900 cycles per sample in total), an
- * estimate from the instruction count — measure your patch with
- * AudioEngine::cpuLoad(): about 20 cycles per mode per sample, plus
- * filter updates at 2 kHz. The default of 24 modes should take roughly
- * a quarter of the CPU; setModes(16) is
- * plenty for bells and bowls, 32+ for bright metallic sounds. Rings runs
- * up to 64 on a 168 MHz chip.
+ * COST ON THE BLACK PILL (84 MHz, 1905 cycles per sample in total),
+ * measured with the profile example: about 127 cycles plus 48 per mode
+ * per sample, filter updates included. 8 modes take 511 cycles (27% of
+ * the CPU), 16 take 894 (47%) and the default 24 take 1282 (67%), so
+ * call setModes(): 12-16 is plenty for bells and bowls. Rings runs up
+ * to 64 modes, but on a 168 MHz chip.
  *
  * MEMORY: the template parameter sizes the bowed-mode delay lines (8 of
  * them, 4 bytes per sample each). 0 (the default) disables bowing and
@@ -181,17 +180,26 @@ public:
 
     // 4. Run the modes, summed in two groups (odd and even mode numbers,
     // Rings' two outputs); the side sum uses the LFO-swept gains.
+    //
+    // SPEED: modes run in pairs (one odd, one even), which removes the
+    // odd/even branch and gives the CPU two independent filters to
+    // overlap while each waits on its own multiply. The sums are added
+    // in the same order as one at a time, so the output is unchanged.
     float input = in * 0.125f;
     float odd = 0.0f, even = 0.0f, side = 0.0f;
-    for (int i = 0; i < numModes_; ++i) {
-      float s = modes_[i].process(input).bp;
-      float a = amplitudes.next();
-      if (i & 1) {
-        even += s * a;
-      } else {
-        odd += s * a;
-      }
-      side += s * sideAmplitudes.next();
+    int i = 0;
+    for (; i + 1 < numModes_; i += 2) {
+      float s0 = modes_[i].process(input).bp;
+      float s1 = modes_[i + 1].process(input).bp;
+      odd += s0 * amplitudes.next();
+      side += s0 * sideAmplitudes.next();
+      even += s1 * amplitudes.next();
+      side += s1 * sideAmplitudes.next();
+    }
+    if (i < numModes_) { // an odd number of modes leaves one over
+      float s0 = modes_[i].process(input).bp;
+      odd += s0 * amplitudes.next();
+      side += s0 * sideAmplitudes.next();
     }
     float center = odd + even;
     side_ = side - center;

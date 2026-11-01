@@ -155,6 +155,7 @@ public:
   void setGQ(float g, float q) {
     g_ = g;
     r_ = 1.0f / q;
+    rg_ = r_ + g_;
     h_ = 1.0f / (1.0f + r_ * g_ + g_ * g_);
   }
 
@@ -172,11 +173,17 @@ public:
    */
   SvfOut process(float in) {
     SvfOut o;
-    o.hp = (in - r_ * state1_ - g_ * state1_ - state2_) * h_;
-    o.bp = g_ * o.hp + state1_;
-    state1_ = g_ * o.hp + o.bp;
-    o.lp = g_ * o.bp + state2_;
-    state2_ = g_ * o.bp + o.lp;
+    // SPEED: r + g is precomputed (rg_), and each integrator's input
+    // g * x is computed once and used twice. Without -ffast-math the
+    // compiler may not make either change itself, because they round
+    // very slightly differently.
+    o.hp = (in - rg_ * state1_ - state2_) * h_;
+    float v1 = g_ * o.hp;
+    o.bp = v1 + state1_;
+    state1_ = v1 + o.bp;
+    float v2 = g_ * o.bp;
+    o.lp = v2 + state2_;
+    state2_ = v2 + o.lp;
     return o;
   }
 
@@ -191,7 +198,7 @@ public:
 
 private:
   float sampleTime_ = 1.0f / SAMPLE_RATE;
-  float g_ = 0.0f, r_ = 1.0f, h_ = 1.0f;
+  float g_ = 0.0f, r_ = 1.0f, rg_ = 1.0f, h_ = 1.0f;
   float state1_ = 0.0f, state2_ = 0.0f;
 };
 

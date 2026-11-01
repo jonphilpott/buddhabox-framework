@@ -9,7 +9,7 @@
  * 2. An effect class (PingPongEcho) written on FxEngine, the same toolkit
  *    the Reverb and Chorus are built with.
  *
- * The patch: three bells play notes chosen by a RandomSequence and snapped
+ * The patch: two bells play notes chosen by a RandomSequence and snapped
  * to a pentatonic scale by a Quantizer, into a ping-pong echo, then a
  * limiter.
  */
@@ -44,7 +44,8 @@ using namespace bb;
 class BellVoice {
 public:
   BellVoice() {
-    resonator_.setModes(12);       // 12 modes keep three bells affordable
+    // 8 modes: about 510 cycles per bell, measured (12 would be 700).
+    resonator_.setModes(8);
     resonator_.setStructure(0.2f); // bell-like, slightly inharmonic
     resonator_.setDamping(0.75f);
     resonator_.setPosition(0.3f);
@@ -148,7 +149,7 @@ private:
 };
 
 // ── The patch ───────────────────────────────────────────────────────────
-const int kNumBells = 3;
+const int kNumBells = 2; // about 54% of the CPU for both
 BellVoice bells[kNumBells];
 PingPongEcho<8192> echo; // 16 KB: about 93 ms per side
 Limiter limiter;
@@ -181,8 +182,11 @@ void audioCallback(int16_t *buffer, uint16_t length) {
     if (clock8.process())
       onTick();
     float mix = 0.0f;
+    // Gain 2.0, set from a host simulation: a one-sample strike puts
+    // little energy into a resonator, so the bells peak near 0.42,
+    // leaving room for the echo's repeats on top.
     for (int b = 0; b < kNumBells; ++b)
-      mix += bells[b].process() * 0.4f;
+      mix += bells[b].process() * 2.0f;
     float left = mix, right = mix;
     echo.process(left, right);
     limiter.process(left, right);
@@ -204,6 +208,8 @@ void setup() {
 void loop() {
   Serial.print("CPU: ");
   Serial.print(AudioEngine::cpuLoad() * 100.0f, 1);
+  Serial.print("%  peak: ");
+  Serial.print(AudioEngine::cpuPeak() * 100.0f, 1);
   Serial.println("%");
   delay(1000);
 }

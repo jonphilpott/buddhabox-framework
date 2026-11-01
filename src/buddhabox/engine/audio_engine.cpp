@@ -72,14 +72,23 @@ static DMA_HandleTypeDef hdma_i2s2_tx;
 // load: 0.5 = half the CPU, 1.0 = the callback no longer keeps up and the
 // audio will glitch.
 //
-// `volatile` because the interrupt writes it and loop() reads it.
+// `volatile` because the interrupt writes them and loop() reads them.
 static volatile uint32_t lastCycles = 0;
+static volatile uint32_t peakCycles = 0; // worst since cpuPeak() last ran
 
 /** Run the user's callback and time it. */
 static void runCallback(int16_t *buffer) {
   uint32_t start = DWT->CYCCNT;
   audioCallback(buffer, AUDIO_BLOCK_SIZE * 2);
-  lastCycles = DWT->CYCCNT - start; // unsigned maths handles wrap-around
+  uint32_t cycles = DWT->CYCCNT - start; // unsigned maths handles wrap
+  lastCycles = cycles;
+  if (cycles > peakCycles)
+    peakCycles = cycles;
+}
+
+/** Cycles available per block: CPU clock / sample rate * frames. */
+static float cyclesPerBlock() {
+  return (float)SystemCoreClock / (float)SAMPLE_RATE * (float)AUDIO_BLOCK_SIZE;
 }
 
 extern "C" void HAL_I2S_TxHalfCpltCallback(I2S_HandleTypeDef *hi2s) {
@@ -124,11 +133,14 @@ void configureI2SClock() {
   HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
 }
 
-float cpuLoad() {
-  // Cycles available per block = CPU clock / sample rate * frames.
-  const float available =
-      (float)SystemCoreClock / (float)SAMPLE_RATE * (float)AUDIO_BLOCK_SIZE;
-  return (float)lastCycles / available;
+float cpuLoad() { return (float)lastCycles / cyclesPerBlock(); }
+
+float cpuPeak() {
+  uint32_t peak = peakCycles;
+  // ponytail: an interrupt between these two lines loses one block's
+  // peak; harmless for a meter, use LDREX/STREX if it ever matters.
+  peakCycles = 0;
+  return (float)peak / cyclesPerBlock();
 }
 
 void begin() {
@@ -183,7 +195,12 @@ void begin() {
   __HAL_LINKDMA(&hi2s2, hdmatx, hdma_i2s2_tx);
 
   // ── Step 5: Enable DMA interrupt ───────────────────────────────────
-  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
+  // Priority 2: lower than USB (1) and SysTick (0). Lower numbers win
+  // on Cortex-M. audioCallback() runs inside this interrupt, so if it
+  // ranked above USB, a patch near 100% CPU would starve USB and the
+  // board would never appear as a serial port. USB's handlers are short,
+  // and the DMA keeps playing the other half-buffer while they run.
+  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 2, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
 
   // ── Step 6: Start DMA playback ─────────────────────────────────────
