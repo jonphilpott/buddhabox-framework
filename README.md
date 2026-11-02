@@ -55,12 +55,14 @@ void loop() {}
 ## Layout
 
 - `src/buddhabox/` — the framework: `core`, `engine`, `io`, `osc`, `noise`,
-  `filter`, `mod`, `dynamics`, `fx`, `physical`, `drums`, `spectral`
+  `filter`, `mod`, `util`, `dynamics`, `fx`, `physical`, `drums`, `spectral`
 - `src/buddhabox.h` — includes everything
 - `examples/` — `minimal`, `singing_bowls`, `drum_machine`, `custom_voice`,
-  `compile_all`, `profile`, `profile_all`, `patch_minimal`, `patch_demo` (each is a `pio run -e <name>` environment)
+  `compile_all`, `profile`, `profile_all`, `patch_minimal`, `patch_demo`, `patch_hardware` (each is a `pio run -e <name>` environment)
 - `docs/index.html` — guide: wiring, conventions, budgets, composition
 - `docs/reference.html` — full API, generated from the docstrings
+- `docs/editor.html` — patch editor: wire modules, knobs, switches and LEDs,
+  save `patch.json` (open it from disk; no server needed)
 - `tests/compare_partials.cpp` — checks every port against Partials
 - `tools/` — project, table, documentation and patch generators
 
@@ -75,6 +77,8 @@ void loop() {}
 - `python3 tools/new_project.py ../my_synth` — start a new project
 - `python3 tools/gen_docs.py` — regenerate the reference after editing docstrings
 - `python3 tools/gen_patch.py path/patch.json` — generate a patch's C++ from JSON
+- `python3 tools/gen_modules.py` — refresh the module list the editor and
+  generator use
 
 ## Licence
 

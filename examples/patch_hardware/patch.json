@@ -1,0 +1,27 @@
+{
+  "modules": {
+    "pitch": {"type": "Knob", "pin": "PA1"},
+    "pitchRange": {
+      "type": "Range",
+      "set": {"setOutput": [110, 880], "setExponential": true}
+    },
+    "button": {"type": "Switch", "pin": "PB3"},
+    "light": {"type": "LED", "pin": "PC13"},
+    "osc": {
+      "type": "Oscillator",
+      "set": {"setWaveform": "Waveform::SAW", "setAmplitude": 0.5}
+    },
+    "env": {"type": "Envelope", "set": {"setAttack": 0.01, "setRelease": 0.8}},
+    "gate": {"type": "LowPassGate", "set": {"setControl": 0}}
+  },
+  "wires": [
+    ["pitch.out", "pitchRange.in"],
+    ["pitchRange.out", "osc.setFrequency"],
+    ["button.out", "env.gate"],
+    ["button.out", "light.in"],
+    ["env.out", "gate.setControl"],
+    ["osc.out", "gate.input"],
+    ["gate.out", "out.left"],
+    ["gate.out", "out.right"]
+  ]
+}

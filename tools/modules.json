@@ -2087,6 +2087,106 @@
   "ram": 60,
   "ram_size": null
  },
+ "Multiply": {
+  "header": "buddhabox/util/multiply.h",
+  "category": "util",
+  "brief": "",
+  "template": null,
+  "call": "process",
+  "returns": "float",
+  "inputs": [
+   {
+    "name": "a",
+    "type": "float",
+    "default": null
+   },
+   {
+    "name": "b",
+    "type": "float",
+    "default": "1.0f"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "out",
+    "expr": "{id}_v_"
+   }
+  ],
+  "params": {},
+  "events": [],
+  "cycles": null,
+  "scaling": null,
+  "ram": null,
+  "ram_size": null
+ },
+ "Range": {
+  "header": "buddhabox/util/range.h",
+  "category": "util",
+  "brief": "",
+  "template": null,
+  "call": "process",
+  "returns": "float",
+  "inputs": [
+   {
+    "name": "in",
+    "type": "float",
+    "default": null
+   }
+  ],
+  "outputs": [
+   {
+    "name": "out",
+    "expr": "{id}_v_"
+   }
+  ],
+  "params": {
+   "setInput": {
+    "args": [
+     {
+      "name": "lo",
+      "type": "float",
+      "default": null
+     },
+     {
+      "name": "hi",
+      "type": "float",
+      "default": null
+     }
+    ],
+    "cycles": null
+   },
+   "setOutput": {
+    "args": [
+     {
+      "name": "lo",
+      "type": "float",
+      "default": null
+     },
+     {
+      "name": "hi",
+      "type": "float",
+      "default": null
+     }
+    ],
+    "cycles": null
+   },
+   "setExponential": {
+    "args": [
+     {
+      "name": "on",
+      "type": "bool",
+      "default": null
+     }
+    ],
+    "cycles": null
+   }
+  },
+  "events": [],
+  "cycles": null,
+  "scaling": null,
+  "ram": null,
+  "ram_size": null
+ },
  "Compressor": {
   "header": "buddhabox/dynamics/compressor.h",
   "category": "dynamics",
@@ -3885,6 +3985,136 @@
   "cycles": 409.3,
   "scaling": null,
   "ram": 148,
+  "ram_size": null
+ },
+ "Knob": {
+  "header": "buddhabox/io/analog_input.h",
+  "category": "hardware",
+  "brief": "A potentiometer: 0.0 fully anticlockwise to 1.0 fully clockwise.",
+  "hardware": true,
+  "pins": [
+   "PA0",
+   "PA1",
+   "PA2",
+   "PA3",
+   "PA4",
+   "PA5",
+   "PA6",
+   "PA7",
+   "PB0",
+   "PB1"
+  ],
+  "template": null,
+  "call": null,
+  "returns": null,
+  "inputs": [],
+  "outputs": [
+   {
+    "name": "out",
+    "expr": "{id}_v_"
+   }
+  ],
+  "params": {},
+  "events": [],
+  "cycles": 0,
+  "scaling": null,
+  "ram": 0,
+  "ram_size": null
+ },
+ "Switch": {
+  "header": "buddhabox/io/switch_input.h",
+  "category": "hardware",
+  "brief": "A push button or toggle to ground: 1.0 while closed, else 0.0.",
+  "hardware": true,
+  "pins": [
+   "PA0",
+   "PA1",
+   "PA2",
+   "PA3",
+   "PA4",
+   "PA5",
+   "PA6",
+   "PA7",
+   "PB0",
+   "PB1",
+   "PA8",
+   "PA9",
+   "PA10",
+   "PA15",
+   "PB3",
+   "PB4",
+   "PB5",
+   "PB6",
+   "PB7",
+   "PB8",
+   "PB9",
+   "PB10",
+   "PB14"
+  ],
+  "template": null,
+  "call": null,
+  "returns": null,
+  "inputs": [],
+  "outputs": [
+   {
+    "name": "out",
+    "expr": "{id}_v_"
+   }
+  ],
+  "params": {},
+  "events": [],
+  "cycles": 0,
+  "scaling": null,
+  "ram": 0,
+  "ram_size": null
+ },
+ "LED": {
+  "header": null,
+  "category": "hardware",
+  "brief": "An LED: lit while its input is above 0.5. PC13 is the on-board LED, which the engine also uses to flag overruns.",
+  "hardware": true,
+  "pins": [
+   "PA0",
+   "PA1",
+   "PA2",
+   "PA3",
+   "PA4",
+   "PA5",
+   "PA6",
+   "PA7",
+   "PB0",
+   "PB1",
+   "PA8",
+   "PA9",
+   "PA10",
+   "PA15",
+   "PB3",
+   "PB4",
+   "PB5",
+   "PB6",
+   "PB7",
+   "PB8",
+   "PB9",
+   "PB10",
+   "PB14",
+   "PC13"
+  ],
+  "template": null,
+  "call": null,
+  "returns": null,
+  "inputs": [
+   {
+    "name": "in",
+    "type": "float",
+    "default": null
+   }
+  ],
+  "outputs": [],
+  "params": {},
+  "events": [],
+  "cycles": 0,
+  "scaling": null,
+  "ram": 0,
   "ram_size": null
  }
 }

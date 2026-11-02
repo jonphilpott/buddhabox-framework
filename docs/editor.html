@@ -1,0 +1,1132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BuddhaBox Patch Editor</title>
+<!--
+  BuddhaBox patch editor. Place modules and hardware, wire them, and save
+  a patch.json for tools/gen_patch.py, which writes the C++.
+
+  One file, no build step and no libraries. The module list comes from
+  modules.js (written by tools/gen_modules.py), loaded with a <script>
+  tag so the page works when opened straight from disk.
+
+  HOW THE CODE IS ORGANISED:
+  1. State: the patch (modules, wires, positions) plus the selection.
+  2. Layout: where each node and jack sits, used by drawing and wiring.
+  3. Drawing: the whole SVG is rebuilt from state after every change.
+     Simple, and fast enough for the few dozen nodes a patch holds.
+  4. Pointer handling: pan, drag nodes, draw wires.
+  5. Inspector: edit the selected module or wire.
+  6. Checks and the rough CPU/RAM estimate (mirrors tools/gen_patch.py).
+  7. Files: save, open, copy, autosave.
+-->
+<style>
+  :root {
+    --paper: #ffffff;
+    --ink: #111111;
+    --ink-2: #555555;
+    --ink-3: #9a9a9a;
+    --line: #e2e2e2;
+    --wash: #f7f7f5;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font: 13px/1.45 var(--sans);
+    display: grid;
+    grid-template-rows: auto 1fr;
+    grid-template-columns: 220px 1fr 290px;
+    grid-template-areas: "top top top" "palette canvas inspector";
+    overflow: hidden;
+  }
+
+  /* ── Top bar ── */
+  header {
+    grid-area: top;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--ink);
+  }
+  .mark { width: 30px; height: 30px; flex: none; }
+  h1 {
+    font: 400 19px/1 var(--serif);
+    letter-spacing: 0.04em;
+    margin: 0 12px 0 0;
+    white-space: nowrap;
+  }
+  h1 small { color: var(--ink-3); font-size: 15px; }
+  button, .button {
+    font: inherit;
+    background: var(--paper);
+    color: var(--ink);
+    border: 1px solid var(--ink);
+    border-radius: 999px;
+    padding: 4px 12px;
+    cursor: pointer;
+  }
+  button:hover, .button:hover { background: var(--ink); color: var(--paper); }
+  button.quiet { border-color: var(--line); }
+  .spacer { flex: 1; }
+  .gauge { width: 150px; }
+  .gauge .label {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--ink-2);
+  }
+  .gauge .track { height: 3px; background: var(--line); margin-top: 3px; }
+  .gauge .fill { height: 3px; background: var(--ink); }
+  .gauge.over .fill {
+    background: repeating-linear-gradient(90deg, var(--ink) 0 4px,
+                                          transparent 4px 6px);
+  }
+  .estimate-note {
+    font: italic 11px var(--serif);
+    color: var(--ink-3);
+    max-width: 120px;
+    line-height: 1.2;
+  }
+
+  /* ── Side panels ── */
+  aside {
+    overflow-y: auto;
+    padding: 14px;
+    background: var(--paper);
+  }
+  #palette { grid-area: palette; border-right: 1px solid var(--line); }
+  #inspector { grid-area: inspector; border-left: 1px solid var(--line); }
+  h2 {
+    font: 400 15px var(--serif);
+    margin: 0 0 8px;
+  }
+  h3 {
+    font: 600 10px var(--sans);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 16px 0 6px;
+  }
+  input, select {
+    font: inherit;
+    color: var(--ink);
+    background: var(--paper);
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 3px 0;
+    width: 100%;
+    outline: none;
+  }
+  input:focus, select:focus { border-bottom-color: var(--ink); }
+  #search { margin-bottom: 4px; }
+  .item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: 0;
+    border-radius: 0;
+    padding: 3px 0;
+    background: none;
+    color: var(--ink);
+  }
+  .item:hover { background: none; color: var(--ink); text-decoration: underline; }
+  .item small { color: var(--ink-3); }
+  .field { margin: 8px 0; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    color: var(--ink-2);
+    font-family: var(--mono);
+  }
+  .args { display: flex; gap: 8px; }
+  .brief { font: italic 13px/1.5 var(--serif); color: var(--ink-2); }
+  code, .mono { font-family: var(--mono); font-size: 11.5px; }
+  .muted { color: var(--ink-3); }
+  .problems li { margin-bottom: 4px; }
+  .legend div { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+  .legend svg { flex: none; }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
+
+  /* ── Canvas ── */
+  #stage { grid-area: canvas; position: relative; overflow: hidden; }
+  #canvas {
+    width: 100%; height: 100%;
+    display: block;
+    touch-action: none;
+    cursor: grab;
+    user-select: none;
+    background: var(--paper);
+  }
+  #canvas.panning { cursor: grabbing; }
+  .node rect.body { fill: var(--paper); stroke: var(--ink); stroke-width: 1; }
+  .node.selected rect.body { stroke-width: 2.5; }
+  .node .title { font: 600 12px var(--sans); fill: var(--ink); }
+  .node .type { font: italic 11px var(--serif); fill: var(--ink-3); }
+  .node .jl { font: 11px var(--sans); fill: var(--ink-2); }
+  .node { cursor: move; }
+  .jack { cursor: crosshair; }
+  .jack .dot { fill: var(--paper); stroke: var(--ink); stroke-width: 1.2; }
+  .jack.output .dot { fill: var(--ink); }
+  .jack:hover .dot { fill: var(--ink); }
+  .jack .hit { fill: transparent; }
+  .wire { fill: none; stroke: var(--ink); stroke-width: 1.4; }
+  .wire.setter { stroke-dasharray: 6 4; }
+  .wire.event { stroke-dasharray: 1.5 3.5; stroke-linecap: round; stroke-width: 1.8; }
+  .wire.selected { stroke-width: 3; }
+  .wire-hit { fill: none; stroke: transparent; stroke-width: 12; cursor: pointer; }
+  .wire.temp { stroke: var(--ink-3); stroke-dasharray: 3 3; }
+  /* Formula on a setter cable; the white stroke under the text keeps it
+     legible where it crosses other lines. */
+  .wl {
+    font: italic 11px var(--serif); fill: var(--ink-2);
+    stroke: var(--paper); stroke-width: 3; paint-order: stroke;
+    pointer-events: none;
+  }
+  #status {
+    position: absolute; left: 14px; bottom: 12px;
+    font: italic 13px var(--serif);
+    color: var(--ink);
+    background: var(--paper);
+    padding: 2px 6px;
+    pointer-events: none;
+  }
+  #empty {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    pointer-events: none;
+    color: var(--ink-3);
+    font: italic 15px var(--serif);
+  }
+  #empty svg { width: 160px; height: 160px; opacity: 0.12; margin-bottom: 12px; }
+
+  @media (max-width: 860px) {
+    body {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 55vh auto auto;
+      grid-template-areas: "top" "canvas" "inspector" "palette";
+      overflow: auto;
+    }
+    header { flex-wrap: wrap; }
+    aside { border: 0; border-top: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <!-- The enso: one brush stroke, left open. Drawn as a thick arc with a
+       thinner tail over it, so the stroke tapers like ink. -->
+  <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
+    <path d="M73 20 A38 38 0 1 0 88 47" fill="none" stroke="#111"
+          stroke-width="11" stroke-linecap="round"/>
+    <path d="M88 47 A38 38 0 0 0 82 30" fill="none" stroke="#111"
+          stroke-width="4" stroke-linecap="round"/>
+  </svg>
+  <h1>BuddhaBox <small>patch editor</small></h1>
+  <button id="new" class="quiet">New</button>
+  <label class="button quiet">Open&hellip;
+    <input id="open" type="file" accept=".json,application/json" hidden>
+  </label>
+  <button id="save">Save patch.json</button>
+  <button id="copy" class="quiet">Copy JSON</button>
+  <div class="spacer"></div>
+  <div class="gauge" id="cpu"><div class="label"><span>CPU</span><span></span></div>
+    <div class="track"><div class="fill"></div></div></div>
+  <div class="gauge" id="ram"><div class="label"><span>RAM</span><span></span></div>
+    <div class="track"><div class="fill"></div></div></div>
+  <div class="estimate-note" title="Each module was timed on its own. In a
+full patch they share the flash cache, so the real load is often higher:
+patch_demo estimates 75% and measures 98%. Check cpuLoad() on the board.">
+    rough estimate; the board decides</div>
+</header>
+
+<aside id="palette">
+  <input id="search" type="search" placeholder="Find a module" autocomplete="off">
+  <div id="list"></div>
+</aside>
+
+<div id="stage">
+  <svg id="canvas" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse">
+        <circle cx="1" cy="1" r="0.9" fill="#d8d8d8"/>
+      </pattern>
+    </defs>
+    <rect id="grid" width="100%" height="100%" fill="url(#dots)"/>
+    <g id="view"></g>
+  </svg>
+  <div id="empty">
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+      <path d="M73 20 A38 38 0 1 0 88 47" fill="none" stroke="#111"
+            stroke-width="9" stroke-linecap="round"/>
+    </svg>
+    Choose a module on the left to begin.
+  </div>
+  <div id="status"></div>
+</div>
+
+<aside id="inspector"></aside>
+
+<script src="modules.js"></script>
+<script>
+'use strict';
+
+// ── 1. State ─────────────────────────────────────────────────────────
+
+const MODULES = window.MODULES || {};
+const STORE_KEY = 'buddhabox-editor-patch';
+
+// Mirrors of the constants in tools/gen_patch.py, for the estimate.
+const BUDGET = 1905;            // CPU cycles per sample at 84 MHz, 44.1 kHz
+const BASE_RAM = 6104;          // the framework's own RAM
+const RAM_SIZE = 65536;
+const UNMEASURED_SETTER = 200;  // assumed cost of an unprofiled setter
+const SAFE = 0.8;
+
+// The patch, in the same shape as patch.json, plus node positions.
+let patch = emptyPatch();
+// What is selected: null, {node: id} or {wire: index}.
+let sel = null;
+// Canvas pan and zoom: screen = world * k + (x, y).
+const view = {x: 40, y: 40, k: 1};
+
+function emptyPatch() {
+  return {control_every: 32, modules: {}, wires: [], pos: {out: [640, 220]}};
+}
+
+// Wires are kept as {from: 'id.port', to: 'id.port', amount}.
+function split(ref) { return ref.split('.'); }
+
+// ── 2. Layout ────────────────────────────────────────────────────────
+
+const NODE_W = 172, HEAD_H = 38, ROW_H = 18;
+
+/** Words for a setter jack: setCarrierFrequency -> carrier frequency. */
+function setterLabel(name) {
+  return name.slice(3).replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+}
+
+/** Only setters whose first argument is a float can take a wire. */
+function modulatable(p) { return p.args.length && p.args[0].type === 'float'; }
+
+/**
+ * The jacks of a node. Left: inputs, events and modulatable setters,
+ * which a wire can end on. Right: outputs, which a wire starts from.
+ */
+function jacks(id) {
+  if (id === 'out') {
+    return {left: [{name: 'left', kind: 'input', label: 'left'},
+                   {name: 'right', kind: 'input', label: 'right'}],
+            right: []};
+  }
+  const spec = MODULES[patch.modules[id].type];
+  const left = [
+    ...spec.inputs.map(i => ({name: i.name, kind: 'input', label: i.name})),
+    ...spec.events.map(e => ({name: e, kind: 'event', label: e})),
+    ...Object.entries(spec.params).filter(([, p]) => modulatable(p))
+        .map(([n]) => ({name: n, kind: 'setter', label: '~ ' + setterLabel(n)})),
+  ];
+  const right = spec.outputs.map(o => ({name: o.name, kind: 'output',
+                                        label: o.name}));
+  return {left, right};
+}
+
+/** Position and size of a node, and the y of each jack. */
+function layout(id) {
+  const [x, y] = patch.pos[id] || [0, 0];
+  const j = jacks(id);
+  const rows = Math.max(j.left.length, j.right.length, 1);
+  return {x, y, w: NODE_W, h: HEAD_H + rows * ROW_H + 8, ...j};
+}
+
+/** World coordinates of a jack. */
+function jackPos(id, name, side) {
+  const L = layout(id);
+  const list = side === 'left' ? L.left : L.right;
+  const i = list.findIndex(j => j.name === name);
+  return [side === 'left' ? L.x : L.x + L.w, L.y + HEAD_H + i * ROW_H + 9];
+}
+
+/** What a wire ends on: 'input', 'setter' or 'event'. */
+function wireKind(w) {
+  const [id, port] = split(w.to);
+  const j = jacks(id).left.find(j => j.name === port);
+  return j ? j.kind : 'input';
+}
+
+// ── 3. Drawing ───────────────────────────────────────────────────────
+
+const svgView = document.getElementById('view');
+const esc = s => String(s).replace(/[&<>"]/g,
+    c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+
+/** A cable: a cubic curve leaving and entering horizontally. */
+function curve(a, b) {
+  const dx = Math.max(40, Math.abs(b[0] - a[0]) / 2);
+  return `M${a[0]} ${a[1]} C${a[0] + dx} ${a[1]} ${b[0] - dx} ${b[1]} ` +
+         `${b[0]} ${b[1]}`;
+}
+
+function drawNode(id) {
+  const L = layout(id);
+  const isOut = id === 'out';
+  const m = patch.modules[id];
+  const sub = isOut ? 'speakers' :
+      m.type + (m.pin ? ' · ' + m.pin : '') +
+      (m.template ? '<' + m.template + '>' : '');
+  const selected = sel && sel.node === id ? ' selected' : '';
+  let s = `<g class="node${selected}" data-node="${esc(id)}" ` +
+          `transform="translate(${L.x} ${L.y})">`;
+  s += `<rect class="body" width="${L.w}" height="${L.h}" rx="${isOut ? 18 : 3}"/>`;
+  s += `<text class="title" x="12" y="17">${esc(isOut ? 'out' : id)}</text>`;
+  s += `<text class="type" x="12" y="31">${esc(sub)}</text>`;
+  L.left.forEach((j, i) => {
+    const y = HEAD_H + i * ROW_H + 9;
+    s += `<g class="jack ${j.kind}" data-jack="${esc(id)}|left|${esc(j.name)}">` +
+         `<circle class="hit" cx="0" cy="${y}" r="8"/>` +
+         (j.kind === 'event'
+             ? `<rect class="dot" x="-3.5" y="${y - 3.5}" width="7" height="7" ` +
+               `transform="rotate(45 0 ${y})"/>`
+             : `<circle class="dot" cx="0" cy="${y}" r="3.6"/>`) +
+         `<text class="jl" x="9" y="${y + 4}">${esc(j.label)}</text></g>`;
+  });
+  L.right.forEach((j, i) => {
+    const y = HEAD_H + i * ROW_H + 9;
+    s += `<g class="jack output" data-jack="${esc(id)}|right|${esc(j.name)}">` +
+         `<circle class="hit" cx="${L.w}" cy="${y}" r="8"/>` +
+         `<circle class="dot" cx="${L.w}" cy="${y}" r="3.6"/>` +
+         `<text class="jl" x="${L.w - 9}" y="${y + 4}" text-anchor="end">` +
+         `${esc(j.label)}</text></g>`;
+  });
+  return s + '</g>';
+}
+
+function draw() {
+  let s = '';
+  patch.wires.forEach((w, i) => {
+    const [a, ap] = split(w.from), [b, bp] = split(w.to);
+    const d = curve(jackPos(a, ap, 'right'), jackPos(b, bp, 'left'));
+    const selected = sel && sel.wire === i ? ' selected' : '';
+    s += `<path class="wire ${wireKind(w)}${selected}" d="${d}"/>` +
+         `<path class="wire-hit" data-wire="${i}" d="${d}"/>`;
+    const p = jackPos(a, ap, 'right'), q = jackPos(b, bp, 'left');
+    // Label setter cables with their formula, halfway along (the curve's
+    // midpoint is the average of its two ends). Skip short cables, where
+    // the label would sit on top of the nodes.
+    if (wireKind(w) === 'setter' && Math.hypot(q[0] - p[0], q[1] - p[1]) > 90) {
+      s += `<text class="wl" x="${(p[0] + q[0]) / 2}" y="${(p[1] + q[1]) / 2 - 5}" ` +
+           `text-anchor="middle">${num(baseOf(b, bp))} + ` +
+           `${num(amountOf(w))}×</text>`;
+    }
+  });
+  if (drag && drag.kind === 'wire') {
+    s += `<path class="wire temp" d="${curve(drag.a, drag.b)}"/>`;
+  }
+  s += Object.keys(patch.pos).filter(id => id === 'out' || patch.modules[id])
+      .map(drawNode).join('');
+  svgView.innerHTML = s;
+  svgView.setAttribute('transform',
+                       `translate(${view.x} ${view.y}) scale(${view.k})`);
+  document.getElementById('empty').style.display =
+      Object.keys(patch.modules).length ? 'none' : 'flex';
+}
+
+let statusTimer = 0;
+function status(msg) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => (el.textContent = ''), 4000);
+}
+
+// ── 4. Pointer handling ──────────────────────────────────────────────
+
+const canvas = document.getElementById('canvas');
+let drag = null;
+
+/** Screen point to world coordinates. */
+function world(e) {
+  const r = canvas.getBoundingClientRect();
+  return [(e.clientX - r.left - view.x) / view.k,
+          (e.clientY - r.top - view.y) / view.k];
+}
+
+canvas.addEventListener('pointerdown', e => {
+  canvas.setPointerCapture(e.pointerId);
+  const jack = e.target.closest('[data-jack]');
+  const node = e.target.closest('[data-node]');
+  const wire = e.target.closest('[data-wire]');
+  if (jack) {
+    // Start a cable. It can be drawn either way: output to input or
+    // input to output; connect() sorts out which end is which.
+    const [id, side, name] = jack.dataset.jack.split('|');
+    const p = jackPos(id, name, side);
+    drag = {kind: 'wire', from: {id, side, name}, a: p, b: p};
+    if (side === 'left') drag.reversed = true;
+  } else if (node) {
+    const id = node.dataset.node;
+    select({node: id});
+    const [wx, wy] = world(e);
+    drag = {kind: 'node', id, dx: wx - patch.pos[id][0],
+            dy: wy - patch.pos[id][1]};
+  } else if (wire) {
+    select({wire: +wire.dataset.wire});
+  } else {
+    select(null);
+    drag = {kind: 'pan', sx: e.clientX - view.x, sy: e.clientY - view.y};
+    canvas.classList.add('panning');
+  }
+});
+
+canvas.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (drag.kind === 'pan') {
+    view.x = e.clientX - drag.sx;
+    view.y = e.clientY - drag.sy;
+  } else if (drag.kind === 'node') {
+    const [wx, wy] = world(e);
+    // Snap to the 12 px half-grid so nodes line up without effort.
+    patch.pos[drag.id] = [Math.round((wx - drag.dx) / 12) * 12,
+                          Math.round((wy - drag.dy) / 12) * 12];
+  } else if (drag.kind === 'wire') {
+    // The loose end follows the pointer. Drawn from an input, the loose
+    // end is the cable's start (a); from an output, its end (b).
+    if (drag.reversed) drag.a = world(e); else drag.b = world(e);
+  }
+  draw();
+});
+
+canvas.addEventListener('pointerup', e => {
+  if (drag && drag.kind === 'wire') {
+    // The element under the pointer, not e.target: pointer capture makes
+    // e.target the canvas itself.
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    const jack = under && under.closest('[data-jack]');
+    if (jack) {
+      const [id, side, name] = jack.dataset.jack.split('|');
+      connect(drag.from, {id, side, name});
+    }
+  }
+  if (drag && drag.kind === 'node') save();
+  drag = null;
+  canvas.classList.remove('panning');
+  draw();
+});
+
+// Zoom around the pointer with the wheel or trackpad pinch.
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = canvas.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const k = Math.min(2, Math.max(0.4, view.k * Math.exp(-e.deltaY * 0.0015)));
+  view.x = mx - (mx - view.x) * (k / view.k);
+  view.y = my - (my - view.y) * (k / view.k);
+  view.k = k;
+  draw();
+}, {passive: false});
+
+/** Would a wire from `a` to `b` close a loop? (gen_patch refuses loops.) */
+function makesLoop(a, b) {
+  if (a === b) return true;
+  // Search downstream from b; reaching a means b already feeds a.
+  const seen = new Set([b]);
+  const todo = [b];
+  while (todo.length) {
+    const id = todo.pop();
+    for (const w of patch.wires) {
+      const [s] = split(w.from), [d] = split(w.to);
+      if (s === id && d !== 'out' && !seen.has(d)) {
+        if (d === a) return true;
+        seen.add(d);
+        todo.push(d);
+      }
+    }
+  }
+  return false;
+}
+
+function connect(p, q) {
+  if (p.side === q.side) {
+    status('A cable joins an output (right) to an input (left).');
+    return;
+  }
+  const [src, dst] = p.side === 'right' ? [p, q] : [q, p];
+  const w = {from: src.id + '.' + src.name, to: dst.id + '.' + dst.name};
+  if (patch.wires.some(x => x.from === w.from && x.to === w.to)) {
+    status('Those two are already joined.');
+    return;
+  }
+  if (dst.id !== 'out' && makesLoop(src.id, dst.id)) {
+    status('That would make a loop, which the generator cannot order.');
+    return;
+  }
+  patch.wires.push(w);
+  select({wire: patch.wires.length - 1});
+  save();
+}
+
+// ── 5. Palette and inspector ─────────────────────────────────────────
+
+const CATEGORIES = [
+  ['hardware', 'Hardware'], ['osc', 'Oscillators'], ['noise', 'Noise'],
+  ['filter', 'Filters'], ['mod', 'Modulation'], ['util', 'Utilities'],
+  ['dynamics', 'Dynamics'],
+  ['fx', 'Effects'], ['physical', 'Physical models'], ['drums', 'Drums'],
+  ['spectral', 'Spectral'],
+];
+
+function drawPalette() {
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  let s = '';
+  for (const [cat, title] of CATEGORIES) {
+    const names = Object.keys(MODULES).filter(n =>
+        MODULES[n].category === cat &&
+        (!q || n.toLowerCase().includes(q) ||
+         (MODULES[n].brief || '').toLowerCase().includes(q))).sort();
+    if (!names.length) continue;
+    s += `<h3>${title}</h3>`;
+    for (const n of names) {
+      const c = MODULES[n].cycles;
+      s += `<button class="item" data-add="${n}" title="${esc(MODULES[n].brief)}">` +
+           `${n} <small>${c ? '≈' + Math.round(c) : ''}</small></button>`;
+    }
+  }
+  document.getElementById('list').innerHTML =
+      s || '<p class="muted">Nothing matches.</p>';
+}
+
+/** A new id: the type in camelCase plus a number (svf1, modalResonator2). */
+function newId(type) {
+  const base = type[0].toLowerCase() + type.slice(1);
+  let n = 1;
+  while (patch.modules[base + n]) n++;
+  return base + n;
+}
+
+function addModule(type) {
+  const id = newId(type);
+  const m = {type};
+  const spec = MODULES[type];
+  if (spec.hardware) {
+    const used = Object.values(patch.modules).map(x => x.pin);
+    m.pin = spec.pins.find(p => !used.includes(p));
+  }
+  patch.modules[id] = m;
+  // Drop it near the middle of the visible canvas, nudged so several
+  // added in a row don't stack exactly.
+  const r = canvas.getBoundingClientRect();
+  const n = Object.keys(patch.modules).length % 6;
+  patch.pos[id] = [Math.round(((r.width / 2 - view.x) / view.k - 86 + n * 18) / 12) * 12,
+                   Math.round(((r.height / 3 - view.y) / view.k + n * 18) / 12) * 12];
+  select({node: id});
+  save();
+}
+
+/** A stored setter value as the text shown in its input. */
+function shown(v) { return v === undefined || v === null ? '' : String(v); }
+
+function drawInspector() {
+  const el = document.getElementById('inspector');
+  if (sel && sel.node && sel.node !== 'out' && patch.modules[sel.node]) {
+    el.innerHTML = moduleInspector(sel.node);
+  } else if (sel && sel.wire !== undefined && patch.wires[sel.wire]) {
+    el.innerHTML = wireInspector(sel.wire);
+  } else {
+    el.innerHTML = patchInspector();
+  }
+}
+
+function moduleInspector(id) {
+  const m = patch.modules[id], spec = MODULES[m.type];
+  const cyc = moduleCycles(m), ram = moduleRam(m);
+  let s = `<h2>${esc(m.type)}</h2><p class="brief">${esc(spec.brief || '')}</p>`;
+  s += `<div class="field"><label>id</label>` +
+       `<input data-rename value="${esc(id)}" spellcheck="false"></div>`;
+  if (spec.hardware) {
+    const used = Object.entries(patch.modules)
+        .filter(([k, x]) => k !== id && x.pin).map(([, x]) => x.pin);
+    s += `<div class="field"><label>pin</label><select data-pin>` +
+         spec.pins.map(p => `<option ${p === m.pin ? 'selected' : ''} ` +
+             `${used.includes(p) ? 'disabled' : ''}>${p}</option>`).join('') +
+         `</select></div>`;
+    if (m.pin === 'PC13') {
+      s += `<p class="muted">PC13 is the on-board LED, which the engine also ` +
+           `lights on an overrun. Add <code>-D BB_OVERRUN_LED=0</code> to ` +
+           `build_flags.</p>`;
+    }
+  }
+  if (spec.template) {
+    s += `<div class="field"><label>template (default ${esc(spec.template)})</label>` +
+         `<input data-template value="${esc(shown(m.template))}" ` +
+         `placeholder="default"></div>`;
+  }
+  if (!spec.hardware) {
+    s += `<p class="muted">≈ ${Math.round(cyc)} cycles per sample, ` +
+         `≈ ${(ram / 1024).toFixed(1)} KB</p>`;
+  }
+  const params = Object.entries(spec.params);
+  if (params.length) s += '<h3>Starting values</h3>';
+  for (const [name, p] of params) {
+    const v = (m.set || {})[name];
+    const vals = Array.isArray(v) ? v : [v];
+    const sig = p.args.map(a => a.name).join(', ');
+    if (p.args.some(a => /[*[]/.test(a.type))) {
+      s += `<div class="field"><label>${name}(${sig})</label>` +
+           `<span class="muted">an array: set it in code</span></div>`;
+      continue;
+    }
+    s += `<div class="field"><label>${name}(${sig})</label><div class="args">`;
+    p.args.forEach((a, i) => {
+      const val = shown(vals[i]);
+      if (a.type === 'bool') {
+        s += `<select data-set="${name}" data-arg="${i}">` +
+             ['', 'true', 'false'].map(o => `<option ${o === val ? 'selected' : ''}>` +
+                 `${o}</option>`).join('') + '</select>';
+      } else {
+        s += `<input data-set="${name}" data-arg="${i}" value="${esc(val)}" ` +
+             `placeholder="${esc(a.name)}: ${esc(a.type)}" spellcheck="false">`;
+      }
+    });
+    s += '</div>';
+    // Say when a cable moves this value, so the number above reads as
+    // the centre of the movement rather than a fixed setting.
+    for (const w of patch.wires) {
+      if (w.to !== id + '.' + name) continue;
+      s += `<span class="muted">moved by ${esc(w.from)}: this value + ` +
+           `${num(amountOf(w))} × signal</span>`;
+    }
+    s += '</div>';
+  }
+  s += `<hr><button data-delete>Remove ${esc(id)}</button>`;
+  return s;
+}
+
+/** A number without float noise: 330.00000001 -> 330. */
+const num = v => String(+(+v).toPrecision(5));
+
+/** A cable's amount; 1 when it has none. */
+const amountOf = w => (w.amount === undefined ? 1 : w.amount);
+
+/**
+ * The starting value a modulating cable moves around: the first argument
+ * of the target's `set` entry, or 0 when there is none (as gen_patch.py).
+ */
+function baseOf(id, setter) {
+  const v = ((patch.modules[id] && patch.modules[id].set) || {})[setter];
+  return Array.isArray(v) ? v[0] : (v === undefined ? 0 : v);
+}
+
+function wireInspector(i) {
+  const w = patch.wires[i], kind = wireKind(w);
+  const [d, port] = split(w.to);
+  const a = amountOf(w);
+  let s = `<h2>Cable</h2><p class="mono">${esc(w.from)} → ${esc(w.to)}</p>`;
+  if (kind === 'event') {
+    s += `<p class="brief">${port === 'trigger'
+        ? 'Fires when the signal rises past 0.5.'
+        : 'Follows the signal: on above 0.5.'} Checked every sample.</p>`;
+  } else if (kind === 'setter') {
+    // Show the actual line of C++ this cable becomes, then the two
+    // numbers in it, then what comes out for typical signal values.
+    // Seeing the formula filled in is clearer than any description.
+    const b = baseOf(d, port);
+    const set = (patch.modules[d].set || {})[port];
+    const rest = Array.isArray(set) ? set.slice(1).map(num) : [];
+    s += `<p class="brief">A setter cable. Every ${patch.control_every} ` +
+         `samples the generated code calls:</p>` +
+         `<p class="mono">${esc(d)}.${esc(port)}(${num(b)} + ${num(a)} × ` +
+         `${esc(w.from)}${rest.length ? ', ' + rest.join(', ') : ''})</p>`;
+    s += `<div class="field"><label>value at signal 0 (the starting value ` +
+         `on ${esc(d)})</label><input data-base value="${num(b)}"></div>`;
+    s += `<div class="field"><label>amount: added for each 1.0 of signal` +
+         `</label><input data-amount value="${num(a)}"></div>`;
+    s += '<h3>So</h3><p class="mono">' +
+         [0, 0.5, 1].map(x => `signal ${x} → ${num(b + a * x)}`).join('<br>') +
+         `<br>signal −1 → ${num(b - a)}</p>` +
+         `<p class="muted">Knobs, switches and envelopes give 0 to 1; LFOs ` +
+         `and audio swing from −1 to 1.` +
+         (patch.modules[split(w.from)[0]].type === 'Range' ? '' :
+          ` The steps are even, which suits levels and times. For a ` +
+          `frequency, put a Range (exponential) in between, so each part ` +
+          `of the turn covers the same number of octaves.`) + `</p>`;
+  } else {
+    s += `<div class="field"><label>amount</label>` +
+         `<input data-amount value="${num(a)}"></div>`;
+    s += `<p class="brief">An audio cable. Every sample, ${esc(w.to)} gets ` +
+         `${num(a)} × ${esc(w.from)}, added to any other cables into it. ` +
+         `The amount is a mix level.</p>`;
+  }
+  return s + `<hr><button data-delete>Remove cable</button>`;
+}
+
+function patchInspector() {
+  const probs = problems();
+  let s = '<h2>Patch</h2>';
+  s += `<div class="field"><label>control_every (samples)</label>` +
+       `<input data-every value="${patch.control_every}"></div>` +
+       `<p class="muted">How often modulated setters update. 32 samples is ` +
+       `0.7 ms: smooth to the ear, and a 170-cycle setter costs about 5 ` +
+       `cycles per sample.</p>`;
+  s += '<h3>Problems</h3>';
+  s += probs.length ? '<ul class="problems">' + probs.map(p => `<li>${esc(p)}</li>`)
+      .join('') + '</ul>' : '<p class="muted">None. Ready to save.</p>';
+  s += `<h3>Cables</h3><div class="legend">
+    <div>${legend('')} audio, every sample</div>
+    <div>${legend('6 4')} setter: starting value + amount × signal</div>
+    <div>${legend('1.5 3.5')} trigger or gate</div></div>`;
+  s += `<h3>To build</h3><p>Save <code>patch.json</code> into a folder under
+    <code>examples/</code>, then run</p>
+    <p class="mono">python3 tools/gen_patch.py examples/my_patch/patch.json</p>
+    <p class="muted">It writes <code>patch_graph.h</code>, plus a starter
+    <code>main.cpp</code> if there is none, and prints the same rough
+    estimate as above.</p>
+    <h3>Keys</h3><p class="muted">Delete removes the selection. Drag the
+    background to pan, scroll to zoom. Cables run from an output (right) to
+    an input (left).</p>`;
+  return s;
+}
+
+function legend(dash) {
+  return `<svg width="34" height="8"><path d="M1 4 H33" stroke="#111" ` +
+         `stroke-width="1.6" stroke-dasharray="${dash}" stroke-linecap="round"/></svg>`;
+}
+
+/** Parse what was typed for one setter argument, by its C++ type. */
+function parseArg(text, type) {
+  if (type === 'bool') return text === 'true';
+  if (type === 'float') return parseFloat(text);
+  if (/^(unsigned |u?int\d*_t|int|uint)/.test(type)) return parseInt(text, 10);
+  return text; // an enum name such as Waveform::SINE
+}
+
+const inspector = document.getElementById('inspector');
+inspector.addEventListener('change', e => {
+  const t = e.target;
+  if (sel && sel.node) {
+    const id = sel.node, m = patch.modules[id];
+    if (t.dataset.rename !== undefined) return rename(id, t.value.trim());
+    if (t.dataset.pin !== undefined) m.pin = t.value;
+    if (t.dataset.template !== undefined) {
+      if (t.value.trim()) m.template = t.value.trim(); else delete m.template;
+    }
+    if (t.dataset.set) {
+      // Gather every argument of this setter; store only when all are
+      // filled, as a single value or a list.
+      const name = t.dataset.set, args = MODULES[m.type].params[name].args;
+      const texts = [...inspector.querySelectorAll(`[data-set="${name}"]`)]
+          .map(x => x.value.trim());
+      m.set = m.set || {};
+      if (texts.every(x => x === '')) {
+        delete m.set[name];
+      } else if (texts.every(x => x !== '')) {
+        const vals = texts.map((x, i) => parseArg(x, args[i].type));
+        if (vals.some(v => typeof v === 'number' && isNaN(v))) {
+          status(name + ': that is not a number.');
+          return;
+        }
+        m.set[name] = vals.length === 1 ? vals[0] : vals;
+      } else {
+        status(`${name} takes ${args.length} values; fill them all.`);
+        return;
+      }
+      if (!Object.keys(m.set).length) delete m.set;
+    }
+  } else if (sel && sel.wire !== undefined) {
+    const w = patch.wires[sel.wire];
+    const v = parseFloat(t.value);
+    if (isNaN(v)) return status('That must be a number.');
+    if (t.dataset.base !== undefined) {
+      // The starting value lives on the module, not the cable: write it
+      // back to the setter's first argument there.
+      const [d, port] = split(w.to), m = patch.modules[d];
+      const nargs = MODULES[m.type].params[port].args.length;
+      m.set = m.set || {};
+      if (Array.isArray(m.set[port])) m.set[port][0] = v;
+      else if (nargs === 1) m.set[port] = v;
+      else return status(`Fill all of ${port}'s values on ${d} first.`);
+    } else {
+      w.amount = v;
+    }
+  } else if (t.dataset.every !== undefined) {
+    const v = parseInt(t.value, 10);
+    if (!(v >= 1)) return status('control_every must be 1 or more.');
+    patch.control_every = v;
+  }
+  save();
+});
+
+inspector.addEventListener('click', e => {
+  if (e.target.dataset.delete !== undefined) removeSelected();
+});
+
+document.getElementById('list').addEventListener('click', e => {
+  const b = e.target.closest('[data-add]');
+  if (b) addModule(b.dataset.add);
+});
+document.getElementById('search').addEventListener('input', drawPalette);
+
+const KEYWORDS = new Set(('int float double bool char void auto const ' +
+  'class struct new delete return if else for while switch case default ' +
+  'break continue do long short signed unsigned static inline namespace ' +
+  'using template typename this true false').split(' '));
+
+function rename(id, to) {
+  if (to === id) return;
+  if (!/^[A-Za-z_]\w*$/.test(to) || to.endsWith('_') || to === 'out' ||
+      KEYWORDS.has(to)) {
+    status('An id is a C++ name (letters, digits, _), not ending in _.');
+    return drawInspector();
+  }
+  if (patch.modules[to]) {
+    status(to + ' is taken.');
+    return drawInspector();
+  }
+  patch.modules[to] = patch.modules[id];
+  delete patch.modules[id];
+  patch.pos[to] = patch.pos[id];
+  delete patch.pos[id];
+  for (const w of patch.wires) {
+    for (const end of ['from', 'to']) {
+      const [m, p] = split(w[end]);
+      if (m === id) w[end] = to + '.' + p;
+    }
+  }
+  sel = {node: to};
+  save();
+}
+
+function removeSelected() {
+  if (!sel) return;
+  if (sel.node && sel.node !== 'out') {
+    const id = sel.node;
+    delete patch.modules[id];
+    delete patch.pos[id];
+    patch.wires = patch.wires.filter(w =>
+        split(w.from)[0] !== id && split(w.to)[0] !== id);
+  } else if (sel.wire !== undefined) {
+    patch.wires.splice(sel.wire, 1);
+  }
+  select(null);
+  save();
+}
+
+document.addEventListener('keydown', e => {
+  const typing = /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
+  if (!typing && (e.key === 'Delete' || e.key === 'Backspace')) {
+    e.preventDefault();
+    removeSelected();
+  }
+  if (e.key === 'Escape') select(null);
+});
+
+function select(s) {
+  sel = s;
+  draw();
+  drawInspector();
+}
+
+// ── 6. Checks and estimate (keep in step with tools/gen_patch.py) ──────
+
+/** Problems gen_patch.py would refuse, in words. */
+function problems() {
+  const out = [];
+  const pins = {};
+  for (const [id, m] of Object.entries(patch.modules)) {
+    const spec = MODULES[m.type];
+    if (!spec) { out.push(`${id}: unknown type ${m.type}`); continue; }
+    if (spec.hardware) {
+      if (!m.pin) out.push(`${id}: choose a pin`);
+      else if (pins[m.pin]) out.push(`${id} and ${pins[m.pin]} share ${m.pin}`);
+      else pins[m.pin] = id;
+    }
+    if (m.template && !/^\d+$/.test(m.template)) {
+      out.push(`${id}: template should be a number`);
+    }
+  }
+  for (const w of patch.wires) {
+    if (wireKind(w) !== 'setter') continue;
+    const [d, port] = split(w.to);
+    const args = MODULES[patch.modules[d].type].params[port].args;
+    const base = ((patch.modules[d].set) || {})[port];
+    if (args.length > 1 && !Array.isArray(base)) {
+      out.push(`${d}.${port} is modulated: give all ${args.length} ` +
+               `starting values`);
+    }
+  }
+  return out;
+}
+
+/** 'uint32_t SIZE = 16384' or '8192' -> 16384 or 8192. */
+function templateSize(t) {
+  const m = /(\d+)\s*$/.exec(t || '');
+  return m ? +m[1] : null;
+}
+
+function moduleCycles(m) {
+  const spec = MODULES[m.type], sc = spec.scaling;
+  if (!sc) return spec.cycles || 0;
+  const set = m.set || {};
+  const per = sc.per + (set[sc.extra_if] ? sc.extra_per : 0);
+  return sc.base + per * (set[sc.setter] !== undefined ? set[sc.setter] : sc.default);
+}
+
+function moduleRam(m) {
+  const spec = MODULES[m.type];
+  const used = templateSize(m.template || spec.template);
+  const measured = spec.ram_size || templateSize(spec.template);
+  return used && measured ? Math.floor((spec.ram || 0) * used / measured)
+                          : (spec.ram || 0);
+}
+
+function estimate() {
+  let cycles = 0, ram = BASE_RAM;
+  for (const m of Object.values(patch.modules)) {
+    cycles += moduleCycles(m);
+    ram += moduleRam(m);
+  }
+  const setters = new Set(patch.wires.filter(w => wireKind(w) === 'setter')
+                              .map(w => w.to));
+  for (const ref of setters) {
+    const [d, port] = split(ref);
+    const c = MODULES[patch.modules[d].type].params[port].cycles;
+    cycles += (c === null || c === undefined ? UNMEASURED_SETTER : c) /
+              patch.control_every;
+  }
+  return {cycles: Math.round(cycles), ram};
+}
+
+function drawGauges() {
+  const {cycles, ram} = estimate();
+  const gauge = (id, share, text) => {
+    const g = document.getElementById(id);
+    g.querySelector('.label span:last-child').textContent = text;
+    g.querySelector('.fill').style.width = Math.min(100, share * 100) + '%';
+    g.classList.toggle('over', share > SAFE);
+  };
+  gauge('cpu', cycles / BUDGET, `≈ ${Math.round(100 * cycles / BUDGET)}%`);
+  gauge('ram', ram / RAM_SIZE,
+        `≈ ${(ram / 1024).toFixed(1)} of ${RAM_SIZE / 1024} KB`);
+}
+
+// ── 7. Files ─────────────────────────────────────────────────────────
+
+/** The patch as patch.json: the generator's keys plus ui positions. */
+function toJson() {
+  const modules = {};
+  for (const [id, m] of Object.entries(patch.modules)) {
+    modules[id] = {type: m.type};
+    if (m.pin) modules[id].pin = m.pin;
+    if (m.template) modules[id].template = m.template;
+    if (m.set && Object.keys(m.set).length) modules[id].set = m.set;
+  }
+  const wires = patch.wires.map(w =>
+      w.amount !== undefined && w.amount !== 1 && wireKind(w) !== 'event'
+          ? [w.from, w.to, {amount: w.amount}] : [w.from, w.to]);
+  return JSON.stringify({control_every: patch.control_every, modules, wires,
+                         ui: {pos: patch.pos}}, null, 2) + '\n';
+}
+
+/** Read a patch.json (from this editor or written by hand). */
+function fromJson(text) {
+  const j = JSON.parse(text);
+  const p = emptyPatch();
+  p.control_every = j.control_every || 32;
+  for (const [id, m] of Object.entries(j.modules || {})) {
+    if (!MODULES[m.type]) throw new Error(`unknown type ${m.type}`);
+    p.modules[id] = JSON.parse(JSON.stringify(m));
+  }
+  p.wires = (j.wires || []).map(w => {
+    const x = {from: w[0], to: w[1]};
+    if (w[2] && w[2].amount !== undefined) x.amount = w[2].amount;
+    return x;
+  });
+  // Positions: from the file, else a simple grid for hand-written ones.
+  const pos = (j.ui && j.ui.pos) || {};
+  Object.keys(p.modules).forEach((id, i) => {
+    p.pos[id] = pos[id] || [24 + (i % 4) * 216, 24 + Math.floor(i / 4) * 228];
+  });
+  if (pos.out) p.pos.out = pos.out;
+  else p.pos.out = [24 + 4 * 216, 24];
+  return p;
+}
+
+function save() {
+  try { localStorage.setItem(STORE_KEY, toJson()); } catch (e) { /* private mode */ }
+  draw();
+  drawInspector();
+  drawGauges();
+}
+
+document.getElementById('save').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([toJson()], {type: 'application/json'}));
+  a.download = 'patch.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  const n = problems().length;
+  status(n ? `Saved, but with ${n} problem${n > 1 ? 's' : ''}: see Patch.`
+           : 'Saved patch.json.');
+});
+
+document.getElementById('copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(toJson());
+    status('Copied.');
+  } catch (e) {
+    status('The browser refused the clipboard; use Save instead.');
+  }
+});
+
+document.getElementById('open').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  f.text().then(text => {
+    try {
+      patch = fromJson(text);
+      select(null);
+      save();
+      status('Opened ' + f.name + '.');
+    } catch (err) {
+      status('Could not read ' + f.name + ': ' + err.message);
+    }
+    e.target.value = '';
+  });
+});
+
+// "New" asks twice instead of a confirm() dialog.
+let newArmed = 0;
+document.getElementById('new').addEventListener('click', e => {
+  if (Date.now() - newArmed < 3000) {
+    patch = emptyPatch();
+    newArmed = 0;
+    e.target.textContent = 'New';
+    select(null);
+    save();
+    status('A fresh patch.');
+  } else {
+    newArmed = Date.now();
+    e.target.textContent = 'Clear all?';
+    setTimeout(() => (e.target.textContent = 'New'), 3000);
+  }
+});
+
+// Start: the last patch from this browser, if any.
+if (!Object.keys(MODULES).length) {
+  status('modules.js is missing: run python3 tools/gen_modules.py');
+}
+try {
+  const saved = localStorage.getItem(STORE_KEY);
+  if (saved) patch = fromJson(saved);
+} catch (e) { patch = emptyPatch(); }
+drawPalette();
+save();
+</script>
+</body>
+</html>

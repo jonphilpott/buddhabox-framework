@@ -42,6 +42,12 @@ PATCH FORMAT:
     pulse lasts only one sample.
 - Module ids may not end in `_`: generated names do (`osc_v_`), so the
   two can never collide.
+- Hardware: {"type": "Knob", "pin": "PA1"} gives 0..1, a "Switch" gives
+  1.0 while closed, an "LED" lights while its `in` is above 0.5. They
+  are read and driven in patch::control(), which main.cpp calls from
+  loop(), never in the audio interrupt (analogRead() is far too slow
+  there). Each value crosses between the two through a volatile float.
+  tools/modules.json lists the pins each may use.
 
 HOW IT WORKS:
 1. Check every module type, setter and wire against modules.json.
@@ -117,13 +123,20 @@ void setup() {
  * time for loop() to run.
  */
 void loop() {
-  // Read pots or buttons here and pass the values to patch::<id>.
-  Serial.print("CPU: ");
-  Serial.print(AudioEngine::cpuLoad() * 100.0f, 1);
-  Serial.print("%  peak: ");
-  Serial.print(AudioEngine::cpuPeak() * 100.0f, 1);
-  Serial.println("%");
-  delay(1000);
+  // Knobs, switches and LEDs. Call often: a knob is only as smooth as
+  // this loop is fast, so never delay() here.
+  patch::control();
+
+  // millis() rather than delay(1000), so control() keeps running.
+  static uint32_t lastPrint = 0;
+  if (millis() - lastPrint >= 1000) {
+    lastPrint = millis();
+    Serial.print("CPU: ");
+    Serial.print(AudioEngine::cpuLoad() * 100.0f, 1);
+    Serial.print("%  peak: ");
+    Serial.print(AudioEngine::cpuPeak() * 100.0f, 1);
+    Serial.println("%");
+  }
 }
 '''
 
@@ -169,6 +182,13 @@ def main():
         for setter in m.get('set', {}):
             if setter not in lib[m['type']]['params']:
                 fail('%s: %s has no %s()' % (mid, m['type'], setter))
+        if lib[m['type']].get('hardware'):
+            if m.get('pin') not in lib[m['type']]['pins']:
+                fail('%s: a %s needs "pin", one of %s' % (
+                    mid, m['type'], ', '.join(lib[m['type']]['pins'])))
+    pins = [m['pin'] for m in mods.values() if 'pin' in m]
+    for pin in sorted({p for p in pins if pins.count(p) > 1}):
+        fail('pin %s is used twice' % pin)
     # Sort each wire by what it ends on: an input (`wires`), a setter
     # (`mods_in`, with its amount) or an event (`events_in`).
     wires, mods_in, events_in = [], [], []
@@ -241,8 +261,12 @@ def main():
         return '(%s) > 0.5f' % expr if ctype == 'bool' else expr
 
     # 3. Write the header.
-    includes = sorted({lib[m['type']]['header'] for m in mods.values()})
-    objects, setters, body = [], [], []
+    includes = sorted({lib[m['type']]['header'] for m in mods.values()} -
+                      {None})
+    hw = [mid for mid in order if lib[mods[mid]['type']].get('hardware')]
+    if hw:
+        includes.insert(0, 'Arduino.h')
+    objects, setters, body, control = [], [], [], []
     if mods_in:
         objects.append('int ctl_count_ = 0; // samples since last control '
                        'update')
@@ -253,6 +277,33 @@ def main():
         body.append('    ctl_count_ = 0;')
     for mid in order:
         m, spec = mods[mid], lib[mods[mid]['type']]
+
+        # Hardware: read or driven in control(), shared with process()
+        # through a volatile float. `volatile` tells the compiler another
+        # context (loop() or the interrupt) changes it, so it must really
+        # read memory each time instead of reusing an old value.
+        if spec.get('hardware'):
+            pin, kind = m['pin'], m['type']
+            objects.append('volatile float %s_v_ = 0.0f; // shared with '
+                           'the audio interrupt' % mid)
+            if kind == 'Knob':
+                objects.append('AnalogInput %s(%s);' % (mid, pin))
+                control.append('  %s.update();' % mid)
+                control.append('  %s_v_ = %s.read();' % (mid, mid))
+            elif kind == 'Switch':
+                objects.append('SwitchInput %s(%s);' % (mid, pin))
+                setters.append('  %s.begin();' % mid)
+                control.append('  %s.update();' % mid)
+                control.append('  %s_v_ = %s.isHeld() ? 1.0f : 0.0f;' %
+                               (mid, mid))
+            else:  # LED. PC13, the on-board LED, lights when driven LOW.
+                on, off = ('LOW', 'HIGH') if pin == 'PC13' else ('HIGH', 'LOW')
+                setters.append('  pinMode(%s, OUTPUT);' % pin)
+                control.append('  digitalWrite(%s, %s_v_ > 0.5f ? %s : %s);'
+                               % (pin, mid, on, off))
+                body.append('  %s_v_ = %s;' % (mid, input_expr(mid, 'in')))
+            continue
+
         tmpl = '<%s>' % m['template'] if 'template' in m else (
             '<>' if spec['template'] else '')
         objects.append('%s%s %s;' % (m['type'], tmpl, mid))
@@ -344,6 +395,10 @@ def main():
         return sc['base'] + per * sets.get(sc['setter'], sc['default'])
 
     cycles = sum(module_cycles(m) for m in mods.values())
+    for k, m in mods.items():
+        if lib[m['type']]['cycles'] is None:
+            print('note: %s (%s) is unmeasured; counted as 0 cycles until '
+                  'profile_all is rerun' % (k, m['type']))
     for d, setter in {(d, dp) for _, (d, dp), _ in mods_in}:
         c = lib[mods[d]['type']]['params'][setter]['cycles']
         if c is None:
@@ -371,7 +426,19 @@ def main():
         '// objects.',
         '#pragma once',
         '',
-        *['#include "%s"' % h for h in includes],
+        *[('#include <%s>' if h == 'Arduino.h' else '#include "%s"') % h
+          for h in includes],
+        *([
+            '',
+            '// The engine lights PC13 when audio runs late. An LED patched',
+            '// to PC13 needs that turned off: add -D BB_OVERRUN_LED=0 to',
+            '// build_flags.',
+            '#include "buddhabox/engine/audio_engine.h"',
+            '#if BB_OVERRUN_LED',
+            '#warning "LED on PC13 clashes with the overrun LED: add '
+            '-D BB_OVERRUN_LED=0"',
+            '#endif',
+        ] if any(mods[h].get('pin') == 'PC13' for h in hw) else []),
         '',
         '// A namespace keeps module names such as `slope` from clashing',
         '// with framework functions of the same name.',
@@ -384,6 +451,14 @@ def main():
         ' *  AudioEngine::begin(). */',
         'inline void setup() {',
         *setters,
+        '}',
+        '',
+        '/**',
+        ' * Read knobs and switches, drive LEDs. Call from loop(), often;',
+        ' * never from the audio interrupt (analogRead() is too slow).',
+        ' */',
+        'inline void control() {',
+        *control,
         '}',
         '',
         '/**',

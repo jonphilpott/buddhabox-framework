@@ -59,6 +59,13 @@ inline void setup() {
 }
 
 /**
+ * Read knobs and switches, drive LEDs. Call from loop(), often;
+ * never from the audio interrupt (analogRead() is too slow).
+ */
+inline void control() {
+}
+
+/**
  * Run every module for one sample, in signal order.
  * @param left   Left output
  * @param right  Right output

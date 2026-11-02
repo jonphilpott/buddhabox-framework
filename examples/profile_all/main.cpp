@@ -198,6 +198,10 @@ SampleAndHold sah;
 TempoClock tempo;
 ClockToRamp clockToRamp;
 Lorenz lorenz;
+
+// ── Utilities ───────────────────────────────────────────────────────────
+Range rangeLin, rangeExp;
+Multiply multiply;
 BouncingBall ball;
 RandomSequence randomSequence;
 Quantizer quantizer;
@@ -262,6 +266,9 @@ void setup() {
   modal24.setModes(24);
   bowed.setModes(12);
   bowed.setBowedModes(true);
+  rangeExp.setInput(-1.0f, 1.0f); // the test signal is noise, -1 to 1
+  rangeExp.setOutput(80.0f, 8000.0f);
+  rangeExp.setExponential(true);
   fm.setFrequency(220.0f);
   // The same reverb settings as `profile`, so the two can be compared.
   reverb.setTime(0.9f);
@@ -370,6 +377,15 @@ void loop() {
           acc += quantizer.process(in, 0.5f));
   PROFILE("HysteresisQuantizer", "mod/hysteresis_quantizer.h",
           sizeof(hysteresis), acc += hysteresis.process(in));
+
+  // 5b. Utilities. The exponential Range is the dearer curve, so it is
+  // the one gen_modules.py keeps (it takes each class's worst row).
+  PROFILE("Range (linear)", "util/range.h", sizeof(rangeLin),
+          acc += rangeLin.process(in));
+  PROFILE("Range (exponential)", "util/range.h", sizeof(rangeExp),
+          acc += rangeExp.process(in));
+  PROFILE("Multiply", "util/multiply.h", sizeof(multiply),
+          acc += multiply.process(in, 0.5f));
 
   // 6. Dynamics.
   PROFILE("LowPassGate", "dynamics/low_pass_gate.h", sizeof(lowPassGate),

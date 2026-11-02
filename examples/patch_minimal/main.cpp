@@ -45,11 +45,18 @@ void setup() {
  * time for loop() to run.
  */
 void loop() {
-  // Read pots or buttons here and pass the values to patch::<id>.
-  Serial.print("CPU: ");
-  Serial.print(AudioEngine::cpuLoad() * 100.0f, 1);
-  Serial.print("%  peak: ");
-  Serial.print(AudioEngine::cpuPeak() * 100.0f, 1);
-  Serial.println("%");
-  delay(1000);
+  // Knobs, switches and LEDs. Call often: a knob is only as smooth as
+  // this loop is fast, so never delay() here.
+  patch::control();
+
+  // millis() rather than delay(1000), so control() keeps running.
+  static uint32_t lastPrint = 0;
+  if (millis() - lastPrint >= 1000) {
+    lastPrint = millis();
+    Serial.print("CPU: ");
+    Serial.print(AudioEngine::cpuLoad() * 100.0f, 1);
+    Serial.print("%  peak: ");
+    Serial.print(AudioEngine::cpuPeak() * 100.0f, 1);
+    Serial.println("%");
+  }
 }

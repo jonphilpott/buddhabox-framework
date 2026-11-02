@@ -59,6 +59,10 @@
 #include "buddhabox/filter/svf.h"
 #include "buddhabox/filter/vowel.h"
 
+// ── util ──
+#include "buddhabox/util/multiply.h"
+#include "buddhabox/util/range.h"
+
 // ── mod ──
 #include "buddhabox/mod/bouncing_ball.h"
 #include "buddhabox/mod/clock.h"

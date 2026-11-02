@@ -19,6 +19,7 @@
 <a href="#noise">Noise</a>
 <a href="#filter">Filters</a>
 <a href="#mod">Modulation</a>
+<a href="#util">Utilities</a>
 <a href="#dynamics">Dynamics</a>
 <a href="#fx">Effects</a>
 <a href="#physical">Physical models</a>
@@ -2018,6 +2019,74 @@ bool peak = env.endOfAttack();</code></pre>
 <div class="method-returns">Returns: 0.0 to 1.0 in AD and AR modes, -1.0 to +1.0 in LOOPING</div></div></div>
 <div class="method-block"><div class="method-sig">bool endOfAttack() const</div><div class="method-desc"><div class="method-returns">Returns: true once the attack is over (for chaining)</div></div></div>
 <div class="method-block"><div class="method-sig">bool endOfRelease() const</div><div class="method-desc"><div class="method-returns">Returns: true once the cycle has ended (for chaining)</div></div></div>
+</div>
+</section>
+<section id="util"><h2>Utilities</h2><p>Rescale and multiply control signals.</p>
+<h3 id="multiply-h">multiply.h</h3>
+<p class="include"><code>#include "buddhabox/util/multiply.h"</code> — Multiply: one signal times another (a VCA, depth control or</p>
+<p>ring modulator).</p>
+<p>In a patch, cables into the same input add up. Adding is mixing. Multiplying is different: one signal sets how much of the other gets through. That one operation does three familiar jobs:</p>
+<p>Envelope × audio   a VCA: the envelope shapes the note&#x27;s volume Knob × LFO         depth: the knob sets how far the LFO swings Audio × audio      ring modulation: sum and difference tones</p>
+<p>Input b defaults to 1.0, so with nothing wired to it, Multiply passes a straight through.</p>
+<p>Example usage: a knob sets vibrato depth Multiply depth; float wobble = depth.process(lfo.process(), knob.read()); osc.setFrequency(220.0f + 10.0f * wobble);</p>
+<div class="module-card" id="multiply">
+<h4>Multiply</h4>
+<div class="method-sig">class Multiply</div>
+<p>Multiplies two signals. Holds no state, so one instance can be reused freely; it exists as a class so a patch can wire it like any module.</p>
+<p class="example-label">Example:</p>
+<pre><code>Multiply vca;
+float out = vca.process(osc.process(), env.process());</code></pre>
+<p class="example-label">Instantiation</p><pre><code>Multiply name;</code></pre>
+<div class="method-block"><div class="method-sig">float process(float a, float b = 1.0f)</div><div class="method-desc"><p>Multiply one sample of each input.</p>
+<p class="example-label">Example:</p>
+<pre><code>float out = vca.process(audio, envelope);</code></pre>
+<div class="method-param">Param <code>a</code> — First signal, any range.</div>
+<div class="method-param">Param <code>b</code> — Second signal, any range (default 1.0: a passes through).</div>
+<div class="method-returns">Returns: a × b.</div></div></div>
+</div>
+<h3 id="range-h">range.h</h3>
+<p class="include"><code>#include "buddhabox/util/range.h"</code> — Range: rescale a control signal, in a straight line or in octaves.</p>
+<p>Most sources speak in small numbers: a knob gives 0 to 1, an LFO -1 to</p>
+<ul><li>Most destinations want something else: a filter wants 80 to 8000 Hz,</li></ul>
+<p>a delay wants 0.05 to 0.6 seconds. Range sits between them.</p>
+<p>Knob (0..1) → Range (80..8000 Hz, exponential) → Svf.setFrequency</p>
+<p>LINEAR OR EXPONENTIAL? ────────────────────── Linear: equal turns of the knob give equal steps in Hz. Halfway on an 80 to 8000 Hz knob is 4040 Hz, so everything below 1 kHz is squashed into the first eighth of the turn.</p>
+<p>Exponential: equal turns give equal *ratios*. 80 to 8000 Hz is about 6.6 octaves, so each 15% of the turn is one octave, and halfway is 800 Hz. Ears hear pitch and brightness this way, so use exponential for any frequency. Use linear for levels, mix amounts and times.</p>
+<h5>How It Works</h5>
+<ul><li>Turn the input into a position t from 0 to 1 within its range, clamped so a stray value cannot overshoot the output range.</li><li>Linear:      out = lo + t * (hi - lo) Exponential: out = lo * 2^(t * octaves),  octaves = log2(hi / lo) The logarithm is slow, so the setters work it out once; process() pays only for fastExp2() (a few dozen cycles).</li></ul>
+<p>Swap lo and hi to turn a knob backwards: setOutput(1.0f, 0.0f).</p>
+<p>Example usage: a cutoff knob AnalogInput knob(PA1); Range cutoff; cutoff.setOutput(80.0f, 8000.0f); cutoff.setExponential(true); // In the control loop: knob.update(); filter.setFrequency(cutoff.process(knob.read()), 0.7f);</p>
+<p>Example usage: an LFO sweeping 200 to 2000 Hz Range sweep; sweep.setInput(-1.0f, 1.0f); // an LFO swings both ways sweep.setOutput(200.0f, 2000.0f); sweep.setExponential(true); float hz = sweep.process(lfo.process());</p>
+<div class="module-card" id="range">
+<h4>Range</h4>
+<div class="method-sig">class Range</div>
+<p>Rescales a signal from one range to another, linearly or in octaves.</p>
+<p>Defaults map 0..1 to 0..1 in a straight line, so a fresh Range passes a knob through unchanged.</p>
+<p class="example-label">Example:</p>
+<pre><code>Range r;
+r.setOutput(110.0f, 880.0f);
+r.setExponential(true);
+float hz = r.process(0.5f); // 311 Hz: halfway in octaves</code></pre>
+<p class="example-label">Instantiation</p><pre><code>Range name;</code></pre>
+<div class="method-block"><div class="method-sig">float process(float in)</div><div class="method-desc"><p>Rescale one sample.</p>
+<p class="example-label">Example:</p>
+<pre><code>float hz = range.process(knob.read());</code></pre>
+<div class="method-param">Param <code>in</code> — Input signal; values outside the input range are clamped to its ends.</div>
+<div class="method-returns">Returns: The value in the output range.</div></div></div>
+<div class="method-block"><div class="method-sig">void setInput(float lo, float hi)</div><div class="method-desc"><p>Set the range the input is expected to cover.</p>
+<p class="example-label">Example:</p>
+<pre><code>range.setInput(-1.0f, 1.0f); // for an LFO or audio-rate source</code></pre>
+<div class="method-param">Param <code>lo</code> — Input value that gives the output&#x27;s lo (default 0.0).</div>
+<div class="method-param">Param <code>hi</code> — Input value that gives the output&#x27;s hi (default 1.0). Must differ from lo.</div></div></div>
+<div class="method-block"><div class="method-sig">void setOutput(float lo, float hi)</div><div class="method-desc"><p>Set the range the output covers.</p>
+<p class="example-label">Example:</p>
+<pre><code>range.setOutput(80.0f, 8000.0f); // Hz for a filter</code></pre>
+<div class="method-param">Param <code>lo</code> — Output at the bottom of the input range (default 0.0).</div>
+<div class="method-param">Param <code>hi</code> — Output at the top (default 1.0). hi below lo reverses the direction.</div></div></div>
+<div class="method-block"><div class="method-sig">void setExponential(bool on)</div><div class="method-desc"><p>Choose the curve.</p>
+<p class="example-label">Example:</p>
+<pre><code>range.setExponential(true);</code></pre>
+<div class="method-param">Param <code>on</code> — true: equal steps of input give equal ratios (octaves), for frequencies. Needs both output ends above zero; otherwise Range stays linear. false (default): straight line, for levels and times.</div></div></div>
 </div>
 </section>
 <section id="dynamics"><h2>Dynamics</h2><p>Gates, followers, compressors.</p>

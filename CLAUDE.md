@@ -22,7 +22,7 @@ The project has an educational focus: highly documented code and a
 - **Build every example:** `pio run`
 - **Build one:** `pio run -e singing_bowls` (envs: minimal, singing_bowls,
   drum_machine, custom_voice, compile_all, profile, profile_all, patch_minimal,
-  patch_demo)
+  patch_demo, patch_hardware)
 - **Upload:** `pio run -e <env> -t upload` (DFU: hold BOOT0, tap NRST, release BOOT0)
 - **Serial Monitor:** `pio device monitor` (examples print `AudioEngine::cpuLoad()`)
 - **Measure CPU:** `pio run -e profile -t upload` prints cycles per sample per module
@@ -50,7 +50,7 @@ The project has an educational focus: highly documented code and a
 - `src/buddhabox/` — the library, one folder per category: `core`
   (dsp_common, random, midi_utils, generated luts), `engine` (I2S/DMA),
   `io` (pots, switches, touch, keypad, LED), `osc`, `noise`, `filter`,
-  `mod`, `dynamics`, `fx`, `physical`, `drums`, `spectral`
+  `mod`, `util` (Range, Multiply), `dynamics`, `fx`, `physical`, `drums`, `spectral`
 - `src/buddhabox.h` — umbrella include
 - `examples/<name>/main.cpp` — one PlatformIO env each
 - `tests/compare_partials.cpp` — host test: every port vs its Partials original
@@ -59,10 +59,14 @@ The project has an educational focus: highly documented code and a
 - `tools/new_project.py` — creates a project linked to this checkout
 - `tools/gen_docs.py` — writes `docs/reference.html` and fills the catalogue
   and code listings in `docs/index.html`
-- `tools/gen_modules.py` — writes `tools/modules.json` (each module's inputs,
-  outputs, setters and cost) from the headers and `tools/costs.csv`
+- `tools/gen_modules.py` — writes `tools/modules.json` and `docs/modules.js`
+  (each module's inputs, outputs, setters and cost, plus the Knob, Switch
+  and LED hardware types) from the headers and `tools/costs.csv`
 - `tools/gen_patch.py` — turns a `patch.json` into `patch_graph.h` (never edit
-  by hand), plus a starter `main.cpp` if there is none
+  by hand), plus a starter `main.cpp` if there is none. Hardware is read in
+  `patch::control()`, called from `loop()`; never `delay()` in `loop()`
+- `docs/editor.html` — standalone patch editor (plain JS + SVG, black and
+  white, no `style.css`); keep its cost maths in step with `gen_patch.py`
 
 ### DSP Module Pattern
 - **Sample-by-Sample:** every module exposes a `process()` that handles one sample.

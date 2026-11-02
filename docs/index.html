@@ -825,8 +825,8 @@ cache, so the figures are slightly optimistic for a full patch.</p>
 <h3>patch_minimal: a patch generated from JSON</h3>
 <p>The same sine tone as <code>minimal</code>, but described in
 <code>patch.json</code> and turned into C++ by
-<code>tools/gen_patch.py</code>. This is the first step towards a
-graphical patch editor: the tool writes the plumbing (objects, starting
+<code>tools/gen_patch.py</code>. The <a href="editor.html">patch editor</a>
+writes the same file. The tool writes the plumbing (objects, starting
 parameters, wiring in signal order) and you write the musical logic.</p>
 <div class="flow">
   <span class="node">patch.json</span>
@@ -862,6 +862,35 @@ pio run -e patch_minimal -t upload</code></pre>
   <tr><td>A setter</td><td><code>filt.setFrequency</code></td><td>Modulation, at control rate: calls the setter once every <code>control_every</code> samples with its <code>set</code> value plus <code>amount</code> &times; the signal. Other arguments keep their <code>set</code> values.</td></tr>
   <tr><td>An event</td><td><code>pluck.trigger</code>, <code>env.gate</code></td><td>Every sample: <code>trigger()</code> fires when the signal rises past 0.5; <code>gate()</code> follows it. Not control rate, because a clock pulse lasts one sample.</td></tr>
 </table>
+<h4>How a setter cable works</h4>
+<p>A setter cable moves a value up and down around a centre. The centre
+is the setter's <code>set</code> value (the "starting value" in the
+editor); the cable's <code>amount</code> is how far each 1.0 of signal
+moves it. A filter set to 800 Hz, with an LFO cable of amount 300:</p>
+<pre><code>"filt": {"type": "Svf", "set": {"setFrequency": [800, 0.7]}}
+["lfo.out", "filt.setFrequency", {"amount": 300}]
+
+// becomes, every control_every samples:
+filt.setFrequency(800.0f + 300.0f * lfo_v_, 0.7f);</code></pre>
+<p>The LFO swings from &minus;1 to 1, so the cutoff swings from 500 to
+1,100 Hz. A knob gives 0 to 1, so the same cable from a knob would turn
+800 to 1,100 Hz. With no <code>set</code> value the centre is 0 and the
+cable alone sets the value. The editor writes this formula on each
+dashed cable and lists what comes out at &minus;1, 0, &frac12; and 1.</p>
+<p>The steps are even, which suits levels, mixes and times. Pitch and
+cutoff need a curve: the ear hears 100 to 200 Hz as the same step as
+1,000 to 2,000 Hz. For those, put a <code>Range</code> in between:</p>
+<pre><code>"cutRange": {"type": "Range",
+             "set": {"setOutput": [80, 8000], "setExponential": true}}
+["knob.out", "cutRange.in"],
+["cutRange.out", "filt.setFrequency"]</code></pre>
+<p>Now each sixth or so of the knob's turn is one octave, and halfway is
+800 Hz rather than the 4,040 Hz a straight line gives.
+<code>Range</code> also takes an LFO's &minus;1 to 1
+(<code>setInput(-1, 1)</code>) and runs backwards if its ends are
+swapped. Cables only add, so to let one signal scale another (a knob
+setting an LFO's depth, an envelope as a VCA) use
+<code>Multiply</code>. Both live in <code>util/</code>.</p>
 <p>Modulating at control rate is what makes it affordable: a filter's
 <code>setFrequency()</code> costs 170 cycles, or about 5 per sample when
 called every 32 samples. Wires may not form a loop.</p>
@@ -901,6 +930,65 @@ is each <code>float name() const</code> getter; each
 <code>tools/costs.csv</code>, the saved output of
 <code>profile_all</code>. Rerun <code>gen_modules.py</code> after changing
 a module's API or re-profiling.</p>
+<h3>patch_hardware: knobs, switches and LEDs</h3>
+<p>Three module types stand for parts on the board. Each needs a
+<code>pin</code>; the tool refuses a pin outside the list or one used
+twice.</p>
+<table>
+  <tr><th>Type</th><th>Jacks</th><th>Pins</th><th>Generated code</th></tr>
+  <tr><td><code>Knob</code></td><td>output <code>out</code>: 0.0 to 1.0</td><td>PA0&ndash;PA7, PB0, PB1 (the ADC pins)</td><td><code>AnalogInput</code>; <code>update()</code> and <code>read()</code></td></tr>
+  <tr><td><code>Switch</code></td><td>output <code>out</code>: 1.0 while closed</td><td>The ADC pins plus PA8&ndash;PA10, PA15, PB3&ndash;PB10, PB14</td><td><code>SwitchInput</code> to ground; <code>isHeld()</code></td></tr>
+  <tr><td><code>LED</code></td><td>input <code>in</code>: lit above 0.5</td><td>As Switch, plus PC13 (the on-board LED)</td><td><code>digitalWrite()</code>; PC13 inverted, as it is active low</td></tr>
+</table>
+<p>Reading a pot with <code>analogRead()</code> is too slow for the audio
+interrupt, so the tool puts hardware in <code>patch::control()</code>,
+which the starter <code>main.cpp</code> calls from <code>loop()</code>.
+Values cross to the audio side through <code>volatile</code> floats. A
+knob is therefore only as smooth as <code>loop()</code> is quick: never
+call <code>delay()</code> there. The starter prints its CPU line with a
+<code>millis()</code> check for this reason.</p>
+<pre><code>"pitch":  {"type": "Knob", "pin": "PA1"},
+"button": {"type": "Switch", "pin": "PB3"},
+"light":  {"type": "LED", "pin": "PC13"}
+
+"pitchRange": {"type": "Range",
+               "set": {"setOutput": [110, 880], "setExponential": true}}
+
+["pitch.out", "pitchRange.in"],
+["pitchRange.out", "osc.setFrequency"],
+["button.out", "env.gate"],
+["button.out", "light.in"]</code></pre>
+<p><code>examples/patch_hardware</code> wires exactly this: the knob
+sweeps the pitch over three octaves, 110 to 880 Hz, through an
+exponential <code>Range</code>, and the button opens an envelope
+into a low-pass gate and lights the LED. The engine also lights PC13 on
+an overrun, so an LED there needs <code>-D BB_OVERRUN_LED=0</code> in
+<code>build_flags</code>; without it the build prints a
+<code>#warning</code> that says so.</p>
+<h3>The patch editor</h3>
+<p><a href="editor.html"><code>docs/editor.html</code></a> builds the
+same <code>patch.json</code> by hand. Open it straight from disk; it
+needs no server and no build step. Pick modules from the left, drag
+cables from an output (right edge) to an input (left edge), and edit
+starting values, pins and cable amounts on the right. It refuses loops,
+flags anything <code>gen_patch.py</code> would refuse, and shows the
+same rough CPU and RAM estimate. <em>Save patch.json</em> downloads the
+file; node positions travel in a <code>ui</code> key that the generator
+ignores.</p>
+<table>
+  <tr><th>Cable</th><th>Ends on</th><th>Runs</th></tr>
+  <tr><td>Solid</td><td>An input (round jack)</td><td>Every sample</td></tr>
+  <tr><td>Dashed</td><td>A setter (jack labelled <code>~</code>)</td><td>Every <code>control_every</code> samples</td></tr>
+  <tr><td>Dotted</td><td>An event (diamond jack)</td><td>Every sample, on the edge</td></tr>
+</table>
+<pre><code>mkdir examples/my_patch          # save patch.json here
+python3 tools/gen_patch.py examples/my_patch/patch.json</code></pre>
+<p>Then add an environment to <code>platformio.ini</code>, as
+<code>patch_minimal</code> has. The editor reads its module list from
+<code>docs/modules.js</code>, which <code>gen_modules.py</code> writes
+beside <code>tools/modules.json</code>. The browser keeps the patch you
+are working on between visits, but only <em>Save</em> writes a
+file.</p>
 </section>
 
 <!-- ───────────────────────────────────────────────────────────────── -->
@@ -1042,6 +1130,10 @@ these changes:</p>
 <div><a href="reference.html#segmentenvelope">SegmentEnvelope</a> — Peaks&#x27; multi-segment envelope: ADSR, AD, AR, looping, or custom.</div>
 <div><a href="reference.html#slewlimiter">SlewLimiter</a> — Slew limiter with independent rise and fall times.</div>
 <div><a href="reference.html#slope">Slope</a> — Tides 2 function generator: envelope, LFO or oscillator.</div>
+</div>
+<h3>Utilities</h3><div class="catalogue">
+<div><a href="reference.html#multiply">Multiply</a> — Multiply: one signal times another (a VCA, depth control or</div>
+<div><a href="reference.html#range">Range</a> — Range: rescale a control signal, in a straight line or in octaves.</div>
 </div>
 <h3>Dynamics</h3><div class="catalogue">
 <div><a href="reference.html#compressor">Compressor</a> — RMS feed-forward compressor with sidechain, from Streams.</div>
