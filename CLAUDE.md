@@ -21,7 +21,8 @@ The project has an educational focus: highly documented code and a
 ## Building and Running
 - **Build every example:** `pio run`
 - **Build one:** `pio run -e singing_bowls` (envs: minimal, singing_bowls,
-  drum_machine, custom_voice, compile_all, profile, profile_all, patch_minimal)
+  drum_machine, custom_voice, compile_all, profile, profile_all, patch_minimal,
+  patch_demo)
 - **Upload:** `pio run -e <env> -t upload` (DFU: hold BOOT0, tap NRST, release BOOT0)
 - **Serial Monitor:** `pio device monitor` (examples print `AudioEngine::cpuLoad()`)
 - **Measure CPU:** `pio run -e profile -t upload` prints cycles per sample per module

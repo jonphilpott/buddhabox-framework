@@ -29,6 +29,8 @@ HOW EACH CLASS IS READ:
 
 Each output carries a C++ expression with `{id}` standing for the
 object's name, so gen_patch.py never needs to know the rules above.
+Generated local names end in `_` (`osc_v_`); module ids may not, so the
+two can never collide.
 """
 
 import csv
@@ -51,6 +53,17 @@ FOLDERS = ['osc', 'noise', 'filter', 'mod', 'dynamics', 'fx', 'physical',
 
 # Building blocks rather than patchable modules.
 SKIP = {'FxEngine', 'DelayLine', 'Colour', 'Xmod'}
+
+# Costs that depend on a setter's value. gen_patch.py computes
+#   base + (per + extra_per if `extra_if` is set true) * setter value
+# ModalResonator measured 704 cycles at 12 modes and 1294 at 24: about
+# 115 + 49 per mode. Bowed, it measured 1294 at 12 modes: about 49 more
+# per mode. The default is 24 modes.
+SCALING = {
+    'ModalResonator': {'setter': 'setModes', 'default': 24, 'base': 115,
+                       'per': 49, 'extra_if': 'setBowedModes',
+                       'extra_per': 49},
+}
 
 
 def parse_args(text):
@@ -77,7 +90,10 @@ def struct_fields(header, name):
 
 
 def load_costs():
-    """{class: worst cycles, 'Class.setX': cycles} and {class: bytes}."""
+    """{class: worst cycles, 'Class.setX': cycles} and
+    {class: (bytes, template size profiled or None)}. RAM comes from the
+    class's first row: buffer sizes vary between rows, so a maximum would
+    mix sizes."""
     cycles, ram = {}, {}
     for line in open(COSTS).read().splitlines()[1:]:
         if not line or line.startswith('#'):
@@ -86,7 +102,8 @@ def load_costs():
         module, _, c, b, _ = line.rsplit(',', 4)
         key = re.match(r'[\w:]+(\.\w+)?', module).group(0)
         cycles[key] = max(cycles.get(key, 0.0), float(c))
-        ram[key] = max(ram.get(key, 0), int(b))
+        size = re.search(r'<(\d+)>', module)
+        ram.setdefault(key, (int(b), int(size.group(1)) if size else None))
     return cycles, ram
 
 
@@ -115,20 +132,20 @@ def read_class(cls, header, include, folder, cycles, ram):
     if stereo:
         inputs = [{'name': 'left', 'type': 'float', 'default': '0.0f'},
                   {'name': 'right', 'type': 'float', 'default': '0.0f'}]
-        outputs = [{'name': 'left', 'expr': '{id}_left'},
-                   {'name': 'right', 'expr': '{id}_right'}]
+        outputs = [{'name': 'left', 'expr': '{id}_left_'},
+                   {'name': 'right', 'expr': '{id}_right_'}]
     else:
         inputs = args
         if ret == 'float':
-            outputs = [{'name': 'out', 'expr': '{id}_v'}]
+            outputs = [{'name': 'out', 'expr': '{id}_v_'}]
         elif ret == 'bool':
-            outputs = [{'name': 'out', 'expr': '({id}_v ? 1.0f : 0.0f)'}]
+            outputs = [{'name': 'out', 'expr': '({id}_v_ ? 1.0f : 0.0f)'}]
         elif ret == 'int':
-            outputs = [{'name': 'out', 'expr': '(float){id}_v'}]
+            outputs = [{'name': 'out', 'expr': '(float){id}_v_'}]
         elif ret == 'void':
             outputs = []
         else:  # a struct of floats
-            outputs = [{'name': f, 'expr': '{id}_v.%s' % f}
+            outputs = [{'name': f, 'expr': '{id}_v_.%s' % f}
                        for f in struct_fields(header, ret)]
     for d in members:
         m = re.match(r'float\s+(\w+)\(\)\s*const$', d)
@@ -163,7 +180,10 @@ def read_class(cls, header, include, folder, cycles, ram):
         'params': params,
         'events': events,
         'cycles': cycles.get(cls['name']),
-        'ram': ram.get(cls['name']),
+        'scaling': SCALING.get(cls['name']),
+        'ram': ram.get(cls['name'], (None, None))[0],
+        # The template size `ram` was measured at (None: the default).
+        'ram_size': ram.get(cls['name'], (None, None))[1],
     }
 
 

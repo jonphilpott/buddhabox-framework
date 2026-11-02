@@ -422,10 +422,13 @@ shown; a smaller buffer saves RAM, not cycles.</p>
   <tr><td><code>Tube.setFrequency</code></td><td>64</td><td>3.4%</td><td>&ndash;</td></tr>
   <tr><td><code>FmOperators.setFrequency</code></td><td>161</td><td>8.4%</td><td>&ndash;</td></tr>
 </table>
-<p><strong>Treat these as estimates within about &plusmn;15%.</strong> The
-same module costs slightly different amounts in different programs,
-because the compiler inlines and lays out code differently each time.
-Check a real patch with <code>AudioEngine::cpuLoad()</code>.</p>
+<p><strong>Treat these as a rough guide.</strong> Each figure is one
+module timed on its own. In a full patch, modules share the flash cache,
+the compiler lays code out differently and interrupts arrive, so the
+same module can cost more. Adding up the table can badly underestimate a
+patch: <code>patch_demo</code> adds up to 75% but measures 98%. Use the
+table to compare modules and spot the expensive ones, then check the
+real patch with <code>AudioEngine::cpuLoad()</code>.</p>
 <p><strong>The resonator dominates.</strong> It costs about 115 cycles plus
 49 per mode, so 24 modes alone use two-thirds of the CPU. 12&ndash;16 modes
 is plenty for bells and bowls.</p>
@@ -846,19 +849,47 @@ parameters, wiring in signal order) and you write the musical logic.</p>
 pio run -e patch_minimal -t upload</code></pre>
 <table>
   <tr><th>Key</th><th>Meaning</th></tr>
+  <tr><td><code>control_every</code></td><td>Top level: samples between control-rate updates of modulated setters (default 32)</td></tr>
   <tr><td><code>type</code></td><td>Any class in <code>tools/modules.json</code></td></tr>
   <tr><td><code>template</code></td><td>Template arguments, e.g. <code>"8192"</code> for <code>Reverb&lt;8192&gt;</code>; omitted means the default</td></tr>
   <tr><td><code>set</code></td><td>Setters called once in <code>patch::setup()</code>; a list passes several arguments (<code>"setFrequency": [800, 0.7]</code>)</td></tr>
-  <tr><td><code>wires</code></td><td><code>["module.output", "module.input"]</code>; <code>out.left</code> and <code>out.right</code> are the speakers</td></tr>
+  <tr><td><code>wires</code></td><td><code>["module.output", "module.target"]</code>, optionally with <code>{"amount": x}</code>; <code>out.left</code> and <code>out.right</code> are the speakers</td></tr>
 </table>
-<p>Several wires into one input are summed; an unwired input gets its
-default, or 0. A float wired into a <code>bool</code> input (a gate or
-clock) counts as true above 0.5. Wires may not form a loop. The tool
-prints the patch's estimated CPU and RAM, from the measured costs above,
-and warns above 80% of the CPU.</p>
+<p>A wire's target is one of three things:</p>
+<table>
+  <tr><th>Target</th><th>Example</th><th>What the generated code does</th></tr>
+  <tr><td>An input</td><td><code>filt.in</code></td><td>Passes the signal every sample. Several wires are summed, each times its <code>amount</code> (a mix level). An unwired input gets its default, or 0; a float into a <code>bool</code> input counts as true above 0.5.</td></tr>
+  <tr><td>A setter</td><td><code>filt.setFrequency</code></td><td>Modulation, at control rate: calls the setter once every <code>control_every</code> samples with its <code>set</code> value plus <code>amount</code> &times; the signal. Other arguments keep their <code>set</code> values.</td></tr>
+  <tr><td>An event</td><td><code>pluck.trigger</code>, <code>env.gate</code></td><td>Every sample: <code>trigger()</code> fires when the signal rises past 0.5; <code>gate()</code> follows it. Not control rate, because a clock pulse lasts one sample.</td></tr>
+</table>
+<p>Modulating at control rate is what makes it affordable: a filter's
+<code>setFrequency()</code> costs 170 cycles, or about 5 per sample when
+called every 32 samples. Wires may not form a loop.</p>
+<p>The tool prints a rough estimate of the patch's CPU and RAM and warns
+above 80% of the CPU or over 64 KB of RAM. CPU comes from the measured costs above
+(the resonator's from its <code>setModes</code> value, about 115 + 49 per
+mode), plus each modulated setter's cost divided by
+<code>control_every</code>. RAM includes the framework's own 6 KB and
+scales each buffer to its template size. The RAM estimate is close;
+the CPU estimate is a rough guide and can be well below the real load.
+The build reports the real RAM, and the starter <code>main.cpp</code>
+prints the real CPU.</p>
+<p><code>examples/patch_demo</code> uses all three kinds: a clock
+triggers a pluck, dust strikes a resonator whose structure a Lorenz
+attractor modulates, an LFO sweeps a filter on a string drone, and all
+three share a reverb. The tool estimates 75% of the CPU and 43 KB of
+RAM; on the board it measures about 98% of the CPU (clean audio, little
+headroom) and the build reports 42.5 KB.</p>
+<pre><code>["clock.out", "pluck.trigger"],
+["chaos.out", "bowl.setStructure", {"amount": 0.3}],
+["lfo.out", "filt.setFrequency", {"amount": 300}],
+["filt.lp", "verb.left", {"amount": 0.3}]</code></pre>
 <p><code>patch_graph.h</code> puts every module in
 <code>namespace patch</code>, so <code>main.cpp</code> reaches them as
-<code>patch::osc</code>. The tool writes <code>main.cpp</code> only if it
+<code>patch::osc</code>. The starter <code>main.cpp</code> prints
+<code>cpuLoad()</code> and <code>cpuPeak()</code> over USB serial once a
+second, to check the estimate. Names the generator invents end in
+<code>_</code> (<code>osc_v_</code>), so module ids may not. The tool writes <code>main.cpp</code> only if it
 does not exist, so your code there is never overwritten.</p>
 <p>Each module's inputs, outputs and setters come from
 <code>tools/modules.json</code>, which <code>tools/gen_modules.py</code>

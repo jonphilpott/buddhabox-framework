@@ -2,9 +2,12 @@
 // Do not edit: change the patch and rerun
 //   python3 tools/gen_patch.py examples/patch_minimal/patch.json
 //
-// Estimated CPU: 31 of 1905 cycles per sample (1%). Estimated RAM:
-// 20 bytes. Include this file from one .cpp only: it defines the
-// module objects.
+// Rough estimate: CPU 31 of 1905 cycles per sample (1%), RAM 6124
+// of 65536 bytes. Real CPU can be well above this (patch_demo: 75%
+// estimated, 98% measured); check cpuLoad() on the board.
+//
+// Include this file from one .cpp only: it defines the module
+// objects.
 #pragma once
 
 #include "buddhabox/osc/oscillator.h"
@@ -30,9 +33,9 @@ inline void setup() {
  * @param right  Right output
  */
 inline void process(float &left, float &right) {
-  auto osc_v = osc.process();
-  left = osc_v;
-  right = osc_v;
+  auto osc_v_ = osc.process();
+  left = osc_v_;
+  right = osc_v_;
 }
 
 } // namespace patch

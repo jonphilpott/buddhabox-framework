@@ -10,7 +10,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -47,7 +47,9 @@
   },
   "events": [],
   "cycles": 43.0,
-  "ram": 36
+  "scaling": null,
+  "ram": 36,
+  "ram_size": null
  },
  "FormantOscillator": {
   "header": "buddhabox/osc/formant.h",
@@ -60,7 +62,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -97,7 +99,9 @@
   },
   "events": [],
   "cycles": 40.5,
-  "ram": 28
+  "scaling": null,
+  "ram": 28,
+  "ram_size": null
  },
  "GrainletOscillator": {
   "header": "buddhabox/osc/grainlet.h",
@@ -110,7 +114,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -157,7 +161,9 @@
   },
   "events": [],
   "cycles": 99.0,
-  "ram": 32
+  "scaling": null,
+  "ram": 32,
+  "ram_size": null
  },
  "HarmonicOscillator": {
   "header": "buddhabox/osc/harmonic.h",
@@ -170,7 +176,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -217,7 +223,9 @@
   },
   "events": [],
   "cycles": 49.3,
-  "ram": 272
+  "scaling": null,
+  "ram": 272,
+  "ram_size": null
  },
  "LFO": {
   "header": "buddhabox/osc/lfo.h",
@@ -230,7 +238,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -277,7 +285,9 @@
   },
   "events": [],
   "cycles": 45.0,
-  "ram": 24
+  "scaling": null,
+  "ram": 24,
+  "ram_size": null
  },
  "Oscillator": {
   "header": "buddhabox/osc/oscillator.h",
@@ -290,7 +300,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -337,7 +347,9 @@
   },
   "events": [],
   "cycles": 30.6,
-  "ram": 20
+  "scaling": null,
+  "ram": 20,
+  "ram_size": null
  },
  "SineOscillator": {
   "header": "buddhabox/osc/sine.h",
@@ -350,7 +362,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -367,7 +379,9 @@
   },
   "events": [],
   "cycles": 39.0,
-  "ram": 12
+  "scaling": null,
+  "ram": 12,
+  "ram_size": null
  },
  "CosineOscillator": {
   "header": "buddhabox/osc/sine.h",
@@ -380,7 +394,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    },
    {
     "name": "value",
@@ -390,7 +404,9 @@
   "params": {},
   "events": [],
   "cycles": null,
-  "ram": null
+  "scaling": null,
+  "ram": null,
+  "ram_size": null
  },
  "StringSynthOscillator": {
   "header": "buddhabox/osc/string_synth.h",
@@ -403,7 +419,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -440,7 +456,9 @@
   },
   "events": [],
   "cycles": 44.0,
-  "ram": 76
+  "scaling": null,
+  "ram": 76,
+  "ram_size": null
  },
  "VariableShapeOscillator": {
   "header": "buddhabox/osc/variable_shape.h",
@@ -453,7 +471,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -500,7 +518,9 @@
   },
   "events": [],
   "cycles": 106.3,
-  "ram": 40
+  "scaling": null,
+  "ram": 40,
+  "ram_size": null
  },
  "VosimOscillator": {
   "header": "buddhabox/osc/vosim.h",
@@ -513,7 +533,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -555,7 +575,9 @@
   },
   "events": [],
   "cycles": 97.0,
-  "ram": 32
+  "scaling": null,
+  "ram": 32,
+  "ram_size": null
  },
  "ZOscillator": {
   "header": "buddhabox/osc/z_osc.h",
@@ -568,7 +590,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -615,7 +637,9 @@
   },
   "events": [],
   "cycles": 124.0,
-  "ram": 36
+  "scaling": null,
+  "ram": 36,
+  "ram_size": null
  },
  "ClockedNoise": {
   "header": "buddhabox/noise/clocked_noise.h",
@@ -634,7 +658,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -651,7 +675,9 @@
   },
   "events": [],
   "cycles": 21.0,
-  "ram": 24
+  "scaling": null,
+  "ram": 24,
+  "ram_size": null
  },
  "Dust": {
   "header": "buddhabox/noise/dust.h",
@@ -664,7 +690,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -681,7 +707,9 @@
   },
   "events": [],
   "cycles": 6.0,
-  "ram": 20
+  "scaling": null,
+  "ram": 20,
+  "ram_size": null
  },
  "WhiteNoise": {
   "header": "buddhabox/noise/noise.h",
@@ -694,13 +722,15 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {},
   "events": [],
   "cycles": 0.0,
-  "ram": 4
+  "scaling": null,
+  "ram": 4,
+  "ram_size": null
  },
  "PinkNoise": {
   "header": "buddhabox/noise/noise.h",
@@ -713,13 +743,15 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {},
   "events": [],
   "cycles": 58.0,
-  "ram": 60
+  "scaling": null,
+  "ram": 60,
+  "ram_size": null
  },
  "Particle": {
   "header": "buddhabox/noise/particle.h",
@@ -732,7 +764,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    },
    {
     "name": "impulse",
@@ -785,7 +817,9 @@
    "trigger"
   ],
   "cycles": 51.2,
-  "ram": 64
+  "scaling": null,
+  "ram": 64,
+  "ram_size": null
  },
  "SmoothRandom": {
   "header": "buddhabox/noise/smooth_random.h",
@@ -798,7 +832,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -815,7 +849,9 @@
   },
   "events": [],
   "cycles": 12.0,
-  "ram": 24
+  "scaling": null,
+  "ram": 24,
+  "ram_size": null
  },
  "AllpassFilter": {
   "header": "buddhabox/filter/allpass.h",
@@ -834,7 +870,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -861,7 +897,9 @@
   },
   "events": [],
   "cycles": 67.0,
-  "ram": 1036
+  "scaling": null,
+  "ram": 1036,
+  "ram_size": 512
  },
  "DcBlocker": {
   "header": "buddhabox/filter/dc_blocker.h",
@@ -880,13 +918,15 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {},
   "events": [],
   "cycles": 5.0,
-  "ram": 12
+  "scaling": null,
+  "ram": 12,
+  "ram_size": null
  },
  "Hilbert": {
   "header": "buddhabox/filter/hilbert.h",
@@ -905,7 +945,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    },
    {
     "name": "i",
@@ -919,7 +959,9 @@
   "params": {},
   "events": [],
   "cycles": 258.0,
-  "ram": 212
+  "scaling": null,
+  "ram": 212,
+  "ram_size": null
  },
  "MoogFilter": {
   "header": "buddhabox/filter/moog_filter.h",
@@ -938,7 +980,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -965,7 +1007,9 @@
   },
   "events": [],
   "cycles": 44.0,
-  "ram": 28
+  "scaling": null,
+  "ram": 28,
+  "ram_size": null
  },
  "OnePole": {
   "header": "buddhabox/filter/one_pole.h",
@@ -984,11 +1028,11 @@
   "outputs": [
    {
     "name": "lp",
-    "expr": "{id}_v.lp"
+    "expr": "{id}_v_.lp"
    },
    {
     "name": "hp",
-    "expr": "{id}_v.hp"
+    "expr": "{id}_v_.hp"
    }
   ],
   "params": {
@@ -1020,7 +1064,9 @@
   },
   "events": [],
   "cycles": 13.0,
-  "ram": 16
+  "scaling": null,
+  "ram": 16,
+  "ram_size": null
  },
  "SVFilter": {
   "header": "buddhabox/filter/sv_filter.h",
@@ -1074,7 +1120,9 @@
   },
   "events": [],
   "cycles": 6.0,
-  "ram": 28
+  "scaling": null,
+  "ram": 28,
+  "ram_size": null
  },
  "Svf": {
   "header": "buddhabox/filter/svf.h",
@@ -1093,15 +1141,15 @@
   "outputs": [
    {
     "name": "lp",
-    "expr": "{id}_v.lp"
+    "expr": "{id}_v_.lp"
    },
    {
     "name": "bp",
-    "expr": "{id}_v.bp"
+    "expr": "{id}_v_.bp"
    },
    {
     "name": "hp",
-    "expr": "{id}_v.hp"
+    "expr": "{id}_v_.hp"
    },
    {
     "name": "g",
@@ -1166,7 +1214,9 @@
   },
   "events": [],
   "cycles": 18.0,
-  "ram": 28
+  "scaling": null,
+  "ram": 28,
+  "ram_size": null
  },
  "VowelFilter": {
   "header": "buddhabox/filter/vowel.h",
@@ -1185,7 +1235,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -1222,7 +1272,9 @@
   },
   "events": [],
   "cycles": 199.0,
-  "ram": 176
+  "scaling": null,
+  "ram": 176,
+  "ram_size": null
  },
  "BouncingBall": {
   "header": "buddhabox/mod/bouncing_ball.h",
@@ -1241,7 +1293,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -1290,7 +1342,9 @@
    "trigger"
   ],
   "cycles": 15.0,
-  "ram": 36
+  "scaling": null,
+  "ram": 36,
+  "ram_size": null
  },
  "TempoClock": {
   "header": "buddhabox/mod/clock.h",
@@ -1303,7 +1357,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "({id}_v ? 1.0f : 0.0f)"
+    "expr": "({id}_v_ ? 1.0f : 0.0f)"
    }
   ],
   "params": {
@@ -1330,7 +1384,9 @@
   },
   "events": [],
   "cycles": 0.2,
-  "ram": 20
+  "scaling": null,
+  "ram": 20,
+  "ram_size": null
  },
  "ClockToRamp": {
   "header": "buddhabox/mod/clock_to_ramp.h",
@@ -1349,7 +1405,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    },
    {
     "name": "frequency",
@@ -1375,7 +1431,9 @@
   },
   "events": [],
   "cycles": 22.2,
-  "ram": 320
+  "scaling": null,
+  "ram": 320,
+  "ram_size": null
  },
  "Envelope": {
   "header": "buddhabox/mod/envelope.h",
@@ -1388,7 +1446,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -1418,7 +1476,9 @@
    "trigger"
   ],
   "cycles": 8.7,
-  "ram": 20
+  "scaling": null,
+  "ram": 20,
+  "ram_size": null
  },
  "HysteresisQuantizer": {
   "header": "buddhabox/mod/hysteresis_quantizer.h",
@@ -1437,13 +1497,15 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "(float){id}_v"
+    "expr": "(float){id}_v_"
    }
   ],
   "params": {},
   "events": [],
   "cycles": 22.0,
-  "ram": 20
+  "scaling": null,
+  "ram": 20,
+  "ram_size": null
  },
  "Lag": {
   "header": "buddhabox/mod/lag.h",
@@ -1472,13 +1534,15 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {},
   "events": [],
   "cycles": 58.5,
-  "ram": 16
+  "scaling": null,
+  "ram": 16,
+  "ram_size": null
  },
  "Lorenz": {
   "header": "buddhabox/mod/lorenz.h",
@@ -1491,7 +1555,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    },
    {
     "name": "x",
@@ -1520,7 +1584,9 @@
   },
   "events": [],
   "cycles": 16.0,
-  "ram": 24
+  "scaling": null,
+  "ram": 24,
+  "ram_size": null
  },
  "Quantizer": {
   "header": "buddhabox/mod/quantizer.h",
@@ -1549,13 +1615,15 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {},
   "events": [],
   "cycles": 186.5,
-  "ram": 204
+  "scaling": null,
+  "ram": 204,
+  "ram_size": null
  },
  "RandomSequence": {
   "header": "buddhabox/mod/random_sequence.h",
@@ -1568,7 +1636,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -1595,7 +1663,9 @@
   },
   "events": [],
   "cycles": 37.0,
-  "ram": 84
+  "scaling": null,
+  "ram": 84,
+  "ram_size": null
  },
  "SampleAndHold": {
   "header": "buddhabox/mod/sample_and_hold.h",
@@ -1619,13 +1689,15 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {},
   "events": [],
   "cycles": 0.0,
-  "ram": 4
+  "scaling": null,
+  "ram": 4,
+  "ram_size": null
  },
  "SegmentEnvelope": {
   "header": "buddhabox/mod/segment_envelope.h",
@@ -1644,7 +1716,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    },
    {
     "name": "value",
@@ -1865,7 +1937,9 @@
   },
   "events": [],
   "cycles": 75.0,
-  "ram": 108
+  "scaling": null,
+  "ram": 108,
+  "ram_size": null
  },
  "SlewLimiter": {
   "header": "buddhabox/mod/slew.h",
@@ -1884,7 +1958,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -1921,7 +1995,9 @@
   },
   "events": [],
   "cycles": 12.0,
-  "ram": 12
+  "scaling": null,
+  "ram": 12,
+  "ram_size": null
  },
  "Slope": {
   "header": "buddhabox/mod/slope.h",
@@ -1940,7 +2016,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -2007,7 +2083,9 @@
   },
   "events": [],
   "cycles": 215.0,
-  "ram": 60
+  "scaling": null,
+  "ram": 60,
+  "ram_size": null
  },
  "Compressor": {
   "header": "buddhabox/dynamics/compressor.h",
@@ -2026,7 +2104,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    },
    {
     "name": "gainReduction",
@@ -2097,7 +2175,9 @@
   },
   "events": [],
   "cycles": 158.0,
-  "ram": 44
+  "scaling": null,
+  "ram": 44,
+  "ram_size": null
  },
  "Follower": {
   "header": "buddhabox/dynamics/follower.h",
@@ -2116,7 +2196,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    },
    {
     "name": "envelope",
@@ -2130,7 +2210,9 @@
   "params": {},
   "events": [],
   "cycles": 141.9,
-  "ram": 92
+  "scaling": null,
+  "ram": 92,
+  "ram_size": null
  },
  "LowPassGate": {
   "header": "buddhabox/dynamics/low_pass_gate.h",
@@ -2149,7 +2231,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -2196,7 +2278,9 @@
   },
   "events": [],
   "cycles": 47.0,
-  "ram": 20
+  "scaling": null,
+  "ram": 20,
+  "ram_size": null
  },
  "Vactrol": {
   "header": "buddhabox/dynamics/vactrol.h",
@@ -2215,7 +2299,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    },
    {
     "name": "gain",
@@ -2260,7 +2344,9 @@
   },
   "events": [],
   "cycles": 131.1,
-  "ram": 76
+  "scaling": null,
+  "ram": 76,
+  "ram_size": null
  },
  "VactrolLpg": {
   "header": "buddhabox/dynamics/vactrol_lpg.h",
@@ -2279,7 +2365,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -2318,7 +2404,9 @@
    "trigger"
   ],
   "cycles": 90.0,
-  "ram": 72
+  "scaling": null,
+  "ram": 72,
+  "ram_size": null
  },
  "Chorus": {
   "header": "buddhabox/fx/chorus.h",
@@ -2342,11 +2430,11 @@
   "outputs": [
    {
     "name": "left",
-    "expr": "{id}_left"
+    "expr": "{id}_left_"
    },
    {
     "name": "right",
-    "expr": "{id}_right"
+    "expr": "{id}_right_"
    }
   ],
   "params": {
@@ -2373,7 +2461,9 @@
   },
   "events": [],
   "cycles": 258.5,
-  "ram": 4188
+  "scaling": null,
+  "ram": 4188,
+  "ram_size": 2048
  },
  "Decimator": {
   "header": "buddhabox/fx/decimator.h",
@@ -2392,7 +2482,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -2409,7 +2499,9 @@
   },
   "events": [],
   "cycles": 22.2,
-  "ram": 28
+  "scaling": null,
+  "ram": 28,
+  "ram_size": null
  },
  "Diffuser": {
   "header": "buddhabox/fx/diffuser.h",
@@ -2433,11 +2525,11 @@
   "outputs": [
    {
     "name": "left",
-    "expr": "{id}_left"
+    "expr": "{id}_left_"
    },
    {
     "name": "right",
-    "expr": "{id}_right"
+    "expr": "{id}_right_"
    }
   ],
   "params": {
@@ -2464,7 +2556,9 @@
   },
   "events": [],
   "cycles": 354.3,
-  "ram": 4224
+  "scaling": null,
+  "ram": 4224,
+  "ram_size": 2048
  },
  "Ensemble": {
   "header": "buddhabox/fx/ensemble.h",
@@ -2488,11 +2582,11 @@
   "outputs": [
    {
     "name": "left",
-    "expr": "{id}_left"
+    "expr": "{id}_left_"
    },
    {
     "name": "right",
-    "expr": "{id}_right"
+    "expr": "{id}_right_"
    }
   ],
   "params": {
@@ -2519,7 +2613,9 @@
   },
   "events": [],
   "cycles": 389.8,
-  "ram": 8292
+  "scaling": null,
+  "ram": 8292,
+  "ram_size": 4096
  },
  "Limiter": {
   "header": "buddhabox/fx/limiter.h",
@@ -2538,7 +2634,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -2555,7 +2651,9 @@
   },
   "events": [],
   "cycles": 103.0,
-  "ram": 16
+  "scaling": null,
+  "ram": 16,
+  "ram_size": null
  },
  "Overdrive": {
   "header": "buddhabox/fx/overdrive.h",
@@ -2574,7 +2672,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -2591,7 +2689,9 @@
   },
   "events": [],
   "cycles": 114.0,
-  "ram": 12
+  "scaling": null,
+  "ram": 12,
+  "ram_size": null
  },
  "PitchShifter": {
   "header": "buddhabox/fx/pitch_shifter.h",
@@ -2610,7 +2710,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -2637,7 +2737,9 @@
   },
   "events": [],
   "cycles": 132.4,
-  "ram": 4192
+  "scaling": null,
+  "ram": 4192,
+  "ram_size": 2048
  },
  "Reverb": {
   "header": "buddhabox/fx/reverb.h",
@@ -2661,11 +2763,11 @@
   "outputs": [
    {
     "name": "left",
-    "expr": "{id}_left"
+    "expr": "{id}_left_"
    },
    {
     "name": "right",
-    "expr": "{id}_right"
+    "expr": "{id}_right_"
    }
   ],
   "params": {
@@ -2722,7 +2824,9 @@
   },
   "events": [],
   "cycles": 509.5,
-  "ram": 8392
+  "scaling": null,
+  "ram": 8392,
+  "ram_size": 4096
  },
  "TableWavefolder": {
   "header": "buddhabox/fx/table_wavefolder.h",
@@ -2741,7 +2845,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    },
    {
     "name": "analog",
@@ -2762,7 +2866,9 @@
   },
   "events": [],
   "cycles": 74.2,
-  "ram": 8
+  "scaling": null,
+  "ram": 8,
+  "ram_size": null
  },
  "WaveFolder": {
   "header": "buddhabox/fx/wave_folder.h",
@@ -2781,7 +2887,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -2798,7 +2904,9 @@
   },
   "events": [],
   "cycles": 8.0,
-  "ram": 4
+  "scaling": null,
+  "ram": 4,
+  "ram_size": null
  },
  "KarplusStrong": {
   "header": "buddhabox/physical/karplus.h",
@@ -2811,7 +2919,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -2828,7 +2936,9 @@
   },
   "events": [],
   "cycles": 15.0,
-  "ram": 1048
+  "scaling": null,
+  "ram": 1048,
+  "ram_size": 512
  },
  "ModalResonator": {
   "header": "buddhabox/physical/modal_resonator.h",
@@ -2852,7 +2962,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    },
    {
     "name": "odd",
@@ -2956,7 +3066,16 @@
   },
   "events": [],
   "cycles": 1294.4,
-  "ram": 4200
+  "scaling": {
+   "setter": "setModes",
+   "default": 24,
+   "base": 115,
+   "per": 49,
+   "extra_if": "setBowedModes",
+   "extra_per": 49
+  },
+  "ram": 2184,
+  "ram_size": null
  },
  "Plucker": {
   "header": "buddhabox/physical/plucker.h",
@@ -2969,7 +3088,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -3008,7 +3127,9 @@
    "trigger"
   ],
   "cycles": 76.0,
-  "ram": 1092
+  "scaling": null,
+  "ram": 1092,
+  "ram_size": null
  },
  "StringModel": {
   "header": "buddhabox/physical/string_model.h",
@@ -3027,7 +3148,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    },
    {
     "name": "aux",
@@ -3088,7 +3209,9 @@
   },
   "events": [],
   "cycles": 420.1,
-  "ram": 3268
+  "scaling": null,
+  "ram": 3268,
+  "ram_size": 512
  },
  "Tube": {
   "header": "buddhabox/physical/tube.h",
@@ -3112,7 +3235,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -3149,7 +3272,9 @@
   },
   "events": [],
   "cycles": 63.5,
-  "ram": 2100
+  "scaling": null,
+  "ram": 2100,
+  "ram_size": 512
  },
  "AnalogKick": {
   "header": "buddhabox/drums/analog_kick.h",
@@ -3162,7 +3287,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -3241,7 +3366,9 @@
    "trigger"
   ],
   "cycles": 234.9,
-  "ram": 136
+  "scaling": null,
+  "ram": 136,
+  "ram_size": null
  },
  "AnalogSnare": {
   "header": "buddhabox/drums/analog_snare.h",
@@ -3254,7 +3381,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -3323,7 +3450,9 @@
    "trigger"
   ],
   "cycles": 442.1,
-  "ram": 340
+  "scaling": null,
+  "ram": 340,
+  "ram_size": null
  },
  "FmDrum": {
   "header": "buddhabox/drums/fm_drum.h",
@@ -3336,7 +3465,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -3385,7 +3514,9 @@
    "trigger"
   ],
   "cycles": 130.1,
-  "ram": 80
+  "scaling": null,
+  "ram": 80,
+  "ram_size": null
  },
  "HiHat": {
   "header": "buddhabox/drums/hihat.h",
@@ -3398,7 +3529,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -3467,7 +3598,9 @@
    "trigger"
   ],
   "cycles": 177.2,
-  "ram": 412
+  "scaling": null,
+  "ram": 412,
+  "ram_size": null
  },
  "SynthKick": {
   "header": "buddhabox/drums/synth_kick.h",
@@ -3480,7 +3613,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -3569,7 +3702,9 @@
    "trigger"
   ],
   "cycles": 248.9,
-  "ram": 188
+  "scaling": null,
+  "ram": 188,
+  "ram_size": null
  },
  "SynthSnare": {
   "header": "buddhabox/drums/synth_snare.h",
@@ -3582,7 +3717,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -3651,7 +3786,9 @@
    "trigger"
   ],
   "cycles": 203.0,
-  "ram": 152
+  "scaling": null,
+  "ram": 152,
+  "ram_size": null
  },
  "FmOperators": {
   "header": "buddhabox/spectral/fm_operators.h",
@@ -3664,7 +3801,7 @@
   "outputs": [
    {
     "name": "out",
-    "expr": "{id}_v"
+    "expr": "{id}_v_"
    }
   ],
   "params": {
@@ -3746,6 +3883,8 @@
   },
   "events": [],
   "cycles": 409.3,
-  "ram": 148
+  "scaling": null,
+  "ram": 148,
+  "ram_size": null
  }
 }

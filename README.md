@@ -58,7 +58,7 @@ void loop() {}
   `filter`, `mod`, `dynamics`, `fx`, `physical`, `drums`, `spectral`
 - `src/buddhabox.h` — includes everything
 - `examples/` — `minimal`, `singing_bowls`, `drum_machine`, `custom_voice`,
-  `compile_all`, `profile`, `profile_all`, `patch_minimal` (each is a `pio run -e <name>` environment)
+  `compile_all`, `profile`, `profile_all`, `patch_minimal`, `patch_demo` (each is a `pio run -e <name>` environment)
 - `docs/index.html` — guide: wiring, conventions, budgets, composition
 - `docs/reference.html` — full API, generated from the docstrings
 - `tests/compare_partials.cpp` — checks every port against Partials

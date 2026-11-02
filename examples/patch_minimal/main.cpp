@@ -33,9 +33,23 @@ void audioCallback(int16_t *buffer, uint16_t length) {
 
 void setup() {
   patch::setup();
+  Serial.begin(115200); // USB serial, for the CPU meter below
   AudioEngine::begin();
 }
 
+/**
+ * Print the CPU load once a second. `peak` is the worst block since the
+ * last print, so it catches spikes the once-a-second load would miss.
+ * Above 100% a block ran late (the blue LED lights). If nothing prints
+ * at all, the patch is over budget: the audio interrupt never leaves
+ * time for loop() to run.
+ */
 void loop() {
   // Read pots or buttons here and pass the values to patch::<id>.
+  Serial.print("CPU: ");
+  Serial.print(AudioEngine::cpuLoad() * 100.0f, 1);
+  Serial.print("%  peak: ");
+  Serial.print(AudioEngine::cpuPeak() * 100.0f, 1);
+  Serial.println("%");
+  delay(1000);
 }

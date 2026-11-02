@@ -1,0 +1,44 @@
+{
+  "control_every": 32,
+  "modules": {
+    "clock": {"type": "TempoClock", "set": {"setBPM": 72}},
+    "pluck": {"type": "Plucker", "set": {"setFrequency": 293.7}},
+    "dust": {"type": "Dust", "set": {"setDensity": 0.3}},
+    "chaos": {"type": "Lorenz", "set": {"setRate": 0.05}},
+    "bowl": {
+      "type": "ModalResonator",
+      "set": {
+        "setModes": 12,
+        "setFrequency": 146.8,
+        "setDamping": 0.85,
+        "setPosition": 0.3,
+        "setStructure": 0.5
+      }
+    },
+    "drone": {
+      "type": "StringSynthOscillator",
+      "set": {"setFrequency": 73.4, "setRegistration": 0.25}
+    },
+    "lfo": {"type": "LFO", "set": {"setFrequency": 0.1}},
+    "filt": {"type": "Svf", "set": {"setFrequency": [500, 0.9]}},
+    "verb": {
+      "type": "Reverb",
+      "set": {"setTime": 0.9, "setAmount": 0.45, "setLp": 0.6}
+    }
+  },
+  "wires": [
+    ["clock.out", "pluck.trigger"],
+    ["dust.out", "bowl.in"],
+    ["chaos.out", "bowl.setStructure", {"amount": 0.3}],
+    ["drone.out", "filt.in"],
+    ["lfo.out", "filt.setFrequency", {"amount": 300}],
+    ["bowl.out", "verb.left", {"amount": 0.5}],
+    ["bowl.side", "verb.right", {"amount": 0.5}],
+    ["filt.lp", "verb.left", {"amount": 0.3}],
+    ["filt.lp", "verb.right", {"amount": 0.3}],
+    ["pluck.out", "verb.left", {"amount": 0.2}],
+    ["pluck.out", "verb.right", {"amount": 0.2}],
+    ["verb.left", "out.left"],
+    ["verb.right", "out.right"]
+  ]
+}
