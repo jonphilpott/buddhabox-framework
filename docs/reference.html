@@ -2021,7 +2021,31 @@ bool peak = env.endOfAttack();</code></pre>
 <div class="method-block"><div class="method-sig">bool endOfRelease() const</div><div class="method-desc"><div class="method-returns">Returns: true once the cycle has ended (for chaining)</div></div></div>
 </div>
 </section>
-<section id="util"><h2>Utilities</h2><p>Rescale and multiply control signals.</p>
+<section id="util"><h2>Utilities</h2><p>Rescale, mix, multiply, and values set from code.</p>
+<h3 id="mixer-h">mixer.h</h3>
+<p class="include"><code>#include "buddhabox/util/mixer.h"</code> — Mixer: adds up to four signals into one.</p>
+<p>In a patch, cables into the same input already add together. A Mixer does that adding once, in one place, so the sum can then be cabled to several destinations. Without it, every destination needs its own copy of every cable:</p>
+<p>without:  key1, key2, key3 → env.gate    (3 cables) key1, key2, key3 → hold.trigger (3 more) with:     key1, key2, key3 → mix (3 cables) mix → env.gate, mix → hold.trigger (2 cables)</p>
+<p>Levels: in a patch, each cable&#x27;s <code>amount</code> sets that channel&#x27;s level, so the Mixer itself has no level settings. Unused inputs default to 0. For more than four channels, cable one Mixer&#x27;s output into another.</p>
+<p>Mixing audio: four full-scale signals can sum to 4.0, well past the -1..1 the DAC accepts. Keep the levels down (0.25 each for four) or follow the mix with a limiter.</p>
+<p>Example usage: three voices into one reverb Mixer mix; float dry = mix.process(0.4f * drone.process(), 0.3f * pluck.process(), 0.3f * bowl.process());</p>
+<div class="module-card" id="mixer">
+<h4>Mixer</h4>
+<div class="method-sig">class Mixer</div>
+<p>Adds up to four signals. Holds no state; it is a class so a patch can wire it like any other module.</p>
+<p class="example-label">Example:</p>
+<pre><code>Mixer mix;
+float out = mix.process(a, b); // c and d default to 0</code></pre>
+<p class="example-label">Instantiation</p><pre><code>Mixer name;</code></pre>
+<div class="method-block"><div class="method-sig">float process(float a = 0.0f, float b = 0.0f, float c = 0.0f, float d = 0.0f)</div><div class="method-desc"><p>Add one sample of each input.</p>
+<p class="example-label">Example:</p>
+<pre><code>float sum = mix.process(osc1, osc2, noise);</code></pre>
+<div class="method-param">Param <code>a</code> — First signal, any range (default 0).</div>
+<div class="method-param">Param <code>b</code> — Second signal, any range (default 0).</div>
+<div class="method-param">Param <code>c</code> — Third signal, any range (default 0).</div>
+<div class="method-param">Param <code>d</code> — Fourth signal, any range (default 0).</div>
+<div class="method-returns">Returns: a + b + c + d.</div></div></div>
+</div>
 <h3 id="multiply-h">multiply.h</h3>
 <p class="include"><code>#include "buddhabox/util/multiply.h"</code> — Multiply: one signal times another (a VCA, depth control or</p>
 <p>ring modulator).</p>
@@ -2043,6 +2067,34 @@ float out = vca.process(osc.process(), env.process());</code></pre>
 <div class="method-param">Param <code>a</code> — First signal, any range.</div>
 <div class="method-param">Param <code>b</code> — Second signal, any range (default 1.0: a passes through).</div>
 <div class="method-returns">Returns: a × b.</div></div></div>
+</div>
+<h3 id="param-h">param.h</h3>
+<p class="include"><code>#include "buddhabox/util/param.h"</code> — Param: a value your own code sets and a patch&#x27;s cables read.</p>
+<p>A generated patch (patch_graph.h) rewrites every setter and event that a cable drives, so main.cpp cannot also call them: the cable wins within a few samples. Param is the meeting point instead. Place it in the patch like a knob without a pin, cable it wherever the value should go (through a Range, mixed with an LFO, into a trigger), and set it from main.cpp:</p>
+<p>patch::note.setValue(220.0f);  // a value: pitch, depth, anything patch::strike.pulse();         // a trigger: one sample of 1.0</p>
+<p>SAFE FROM loop() AND FROM THE AUDIO CALLBACK ──────────────────────────────────────────── loop() runs in the main program; the patch runs in the audio interrupt, which can cut in at any instruction. Param stores only a float and a bool, each written in a single instruction on the Cortex-M4, so the interrupt never sees half a write. Both are <code>volatile</code>, which tells the compiler another context changes them, so it must reread memory every time instead of keeping a stale copy in a register.</p>
+<p>WHY pulse() AND NOT setValue(1) THEN setValue(0)? ───────────────────────────────────────────────── From loop(), the two writes can land between two audio samples, and the patch never sees the 1. pulse() raises a flag that only the audio side clears, after reporting 1.0 for exactly one sample. A trigger cable fires on that rising edge.</p>
+<p>Example usage: a sequencer in loop() playing a patch // patch.json: &quot;note&quot; (Param) -&gt; osc.setFrequency, //             &quot;strike&quot; (Param) -&gt; env.trigger void loop() { patch::control(); static uint32_t last = 0; if (millis() - last &gt;= 250) { last = millis(); patch::note.setValue(notes[step++ &amp; 3]); patch::strike.pulse(); } }</p>
+<div class="module-card" id="param">
+<h4>Param</h4>
+<div class="method-sig">class Param</div>
+<p>A value set by code and read by a patch. Starts at 0 unless given a starting value with setValue().</p>
+<p class="example-label">Example:</p>
+<pre><code>Param depth;
+depth.setValue(0.3f);         // from loop() or the audio callback
+float d = depth.process();    // in the patch: 0.3</code></pre>
+<p class="example-label">Instantiation</p><pre><code>Param name;</code></pre>
+<div class="method-block"><div class="method-sig">float process()</div><div class="method-desc"><p>Read the value for one sample. A pending pulse() reads as 1.0 for this one sample, then the value returns.</p>
+<p class="example-label">Example:</p>
+<pre><code>float v = param.process();</code></pre>
+<div class="method-returns">Returns: The value, or 1.0 on a pulse.</div></div></div>
+<div class="method-block"><div class="method-sig">void setValue(float v)</div><div class="method-desc"><p>Set the value. Takes effect from the next sample (or the next control update, for a cable into a setter).</p>
+<p class="example-label">Example:</p>
+<pre><code>patch::note.setValue(330.0f);</code></pre>
+<div class="method-param">Param <code>v</code> — Any float: a frequency, a 0..1 level, a scale step.</div></div></div>
+<div class="method-block"><div class="method-sig">void pulse()</div><div class="method-desc"><p>Send a trigger: process() returns 1.0 for one sample. Safe to call from loop(). Calls closer together than one sample merge into one.</p>
+<p class="example-label">Example:</p>
+<pre><code>patch::strike.pulse(); // fires anything cabled to its trigger</code></pre></div></div>
 </div>
 <h3 id="range-h">range.h</h3>
 <p class="include"><code>#include "buddhabox/util/range.h"</code> — Range: rescale a control signal, in a straight line or in octaves.</p>

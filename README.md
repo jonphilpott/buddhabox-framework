@@ -58,7 +58,7 @@ void loop() {}
   `filter`, `mod`, `util`, `dynamics`, `fx`, `physical`, `drums`, `spectral`
 - `src/buddhabox.h` — includes everything
 - `examples/` — `minimal`, `singing_bowls`, `drum_machine`, `custom_voice`,
-  `compile_all`, `profile`, `profile_all`, `patch_minimal`, `patch_demo`, `patch_hardware` (each is a `pio run -e <name>` environment)
+  `compile_all`, `profile`, `profile_all`, `patch_minimal`, `patch_demo`, `patch_hardware`, `patch_param` (each is a `pio run -e <name>` environment)
 - `docs/index.html` — guide: wiring, conventions, budgets, composition
 - `docs/reference.html` — full API, generated from the docstrings
 - `docs/editor.html` — patch editor: wire modules, knobs, switches and LEDs,

@@ -888,9 +888,12 @@ cutoff need a curve: the ear hears 100 to 200 Hz as the same step as
 800 Hz rather than the 4,040 Hz a straight line gives.
 <code>Range</code> also takes an LFO's &minus;1 to 1
 (<code>setInput(-1, 1)</code>) and runs backwards if its ends are
-swapped. Cables only add, so to let one signal scale another (a knob
-setting an LFO's depth, an envelope as a VCA) use
-<code>Multiply</code>. Both live in <code>util/</code>.</p>
+swapped. Cables into one input add up; to add signals once and send the sum to
+several places, use a <code>Mixer</code> (four inputs, levels set by the
+cable amounts, chained for more). Cables only add, so to let one signal
+scale another (a knob setting an LFO's depth, an envelope as a VCA) use
+<code>Multiply</code>. All three live in <code>util/</code>, with
+<code>Param</code> (below).</p>
 <p>Modulating at control rate is what makes it affordable: a filter's
 <code>setFrequency()</code> costs 170 cycles, or about 5 per sample when
 called every 32 samples. Wires may not form a loop.</p>
@@ -965,6 +968,57 @@ into a low-pass gate and lights the LED. The engine also lights PC13 on
 an overrun, so an LED there needs <code>-D BB_OVERRUN_LED=0</code> in
 <code>build_flags</code>; without it the build prints a
 <code>#warning</code> that says so.</p>
+<h3>patch_param: playing a patch from main.cpp</h3>
+<p>Every module is a global in <code>namespace patch</code>, so
+<code>main.cpp</code> can call <code>patch::env.trigger()</code> or
+<code>patch::osc.setFrequency(220.0f)</code> directly. Two things
+decide whether that works:</p>
+<ul>
+  <li><strong>Cables win.</strong> The generated code rewrites every
+  setter and event a cable drives: setters every
+  <code>control_every</code> samples, events every sample. Call such a
+  setter from <code>main.cpp</code> and the patch overwrites it within a
+  millisecond.</li>
+  <li><strong>Where the code runs.</strong> Code in
+  <code>audioCallback()</code>, beside <code>patch::process()</code>, is
+  sample-accurate and cannot be interrupted, but must be quick: no
+  <code>Serial</code>, no <code>analogRead()</code>. Code in
+  <code>loop()</code> can be slow, but the audio interrupt can cut in
+  halfway through a call that changes several fields of a module.</li>
+</ul>
+<p><code>Param</code> solves both. It is a value with an
+<code>out</code> jack: place it in the patch, cable it wherever the value
+should go, and set it from <code>main.cpp</code>. Because it goes
+through cables, it can pass through a <code>Range</code> or be mixed
+with an LFO like any other signal. It is safe to set from
+<code>loop()</code>: it stores one float and one flag, and the processor
+writes each in a single instruction.</p>
+<table>
+  <tr><th>Call</th><th>What the patch sees</th></tr>
+  <tr><td><code>patch::note.setValue(330.0f)</code></td><td>330 from the next sample on</td></tr>
+  <tr><td><code>patch::strike.pulse()</code></td><td>1.0 for exactly one sample, then the value again: fires anything cabled to a <code>trigger</code></td></tr>
+</table>
+<p>Use <code>pulse()</code> for triggers rather than
+<code>setValue(1)</code> then <code>setValue(0)</code>: from
+<code>loop()</code>, both writes can fall between two samples, and the
+patch never sees the 1. <code>examples/patch_param</code> runs a
+four-note sequencer in <code>loop()</code>. Its <code>note</code> Param
+sets the pitch, an LFO adds &plusmn;3 Hz of vibrato on the same cable
+target, and its <code>strike</code> Param triggers an envelope into a
+<code>Multiply</code> used as a VCA:</p>
+<pre><code>// patch.json
+"note":   {"type": "Param", "set": {"setValue": 220}},
+"strike": {"type": "Param"},
+["note.out", "osc.setFrequency"],
+["vibrato.out", "osc.setFrequency", {"amount": 3}],
+["strike.out", "env.trigger"],
+
+// main.cpp, in loop()
+if (millis() - lastStep >= 300) {
+  lastStep = millis();
+  patch::note.setValue(notes[step++ &amp; 3]);
+  patch::strike.pulse();
+}</code></pre>
 <h3>The patch editor</h3>
 <p><a href="editor.html"><code>docs/editor.html</code></a> builds the
 same <code>patch.json</code> by hand. Open it straight from disk; it
@@ -1132,7 +1186,9 @@ these changes:</p>
 <div><a href="reference.html#slope">Slope</a> — Tides 2 function generator: envelope, LFO or oscillator.</div>
 </div>
 <h3>Utilities</h3><div class="catalogue">
+<div><a href="reference.html#mixer">Mixer</a> — Mixer: adds up to four signals into one.</div>
 <div><a href="reference.html#multiply">Multiply</a> — Multiply: one signal times another (a VCA, depth control or</div>
+<div><a href="reference.html#param">Param</a> — Param: a value your own code sets and a patch&#x27;s cables read.</div>
 <div><a href="reference.html#range">Range</a> — Range: rescale a control signal, in a straight line or in octaves.</div>
 </div>
 <h3>Dynamics</h3><div class="catalogue">

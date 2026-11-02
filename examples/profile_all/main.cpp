@@ -201,7 +201,9 @@ Lorenz lorenz;
 
 // ── Utilities ───────────────────────────────────────────────────────────
 Range rangeLin, rangeExp;
+Mixer mixer;
 Multiply multiply;
+Param param;
 BouncingBall ball;
 RandomSequence randomSequence;
 Quantizer quantizer;
@@ -384,8 +386,11 @@ void loop() {
           acc += rangeLin.process(in));
   PROFILE("Range (exponential)", "util/range.h", sizeof(rangeExp),
           acc += rangeExp.process(in));
+  PROFILE("Mixer", "util/mixer.h", sizeof(mixer),
+          acc += mixer.process(in, 0.5f, 0.25f, 0.125f));
   PROFILE("Multiply", "util/multiply.h", sizeof(multiply),
           acc += multiply.process(in, 0.5f));
+  PROFILE("Param", "util/param.h", sizeof(param), acc += param.process());
 
   // 6. Dynamics.
   PROFILE("LowPassGate", "dynamics/low_pass_gate.h", sizeof(lowPassGate),

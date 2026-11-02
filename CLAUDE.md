@@ -22,7 +22,7 @@ The project has an educational focus: highly documented code and a
 - **Build every example:** `pio run`
 - **Build one:** `pio run -e singing_bowls` (envs: minimal, singing_bowls,
   drum_machine, custom_voice, compile_all, profile, profile_all, patch_minimal,
-  patch_demo, patch_hardware)
+  patch_demo, patch_hardware, patch_param)
 - **Upload:** `pio run -e <env> -t upload` (DFU: hold BOOT0, tap NRST, release BOOT0)
 - **Serial Monitor:** `pio device monitor` (examples print `AudioEngine::cpuLoad()`)
 - **Measure CPU:** `pio run -e profile -t upload` prints cycles per sample per module
@@ -50,7 +50,7 @@ The project has an educational focus: highly documented code and a
 - `src/buddhabox/` — the library, one folder per category: `core`
   (dsp_common, random, midi_utils, generated luts), `engine` (I2S/DMA),
   `io` (pots, switches, touch, keypad, LED), `osc`, `noise`, `filter`,
-  `mod`, `util` (Range, Multiply), `dynamics`, `fx`, `physical`, `drums`, `spectral`
+  `mod`, `util` (Range, Mixer, Multiply, Param), `dynamics`, `fx`, `physical`, `drums`, `spectral`
 - `src/buddhabox.h` — umbrella include
 - `examples/<name>/main.cpp` — one PlatformIO env each
 - `tests/compare_partials.cpp` — host test: every port vs its Partials original

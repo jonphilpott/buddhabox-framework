@@ -60,7 +60,9 @@
 #include "buddhabox/filter/vowel.h"
 
 // ── util ──
+#include "buddhabox/util/mixer.h"
 #include "buddhabox/util/multiply.h"
+#include "buddhabox/util/param.h"
 #include "buddhabox/util/range.h"
 
 // ── mod ──

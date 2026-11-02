@@ -5,7 +5,10 @@
  *
  * patch_graph.h is generated from patch.json: change the patch there and
  * rerun tools/gen_patch.py. Reach any module from here as patch::<id>,
- * e.g. patch::osc.setFrequency(440.0f), to add your own logic.
+ * e.g. patch::osc.setFrequency(440.0f), to add your own logic. But a
+ * setter or event that a cable drives is rewritten by the patch within
+ * a few samples; to feed those from code, add a Param to the patch,
+ * cable it there, and call patch::<id>.setValue() or .pulse().
  */
 
 #include <Arduino.h>

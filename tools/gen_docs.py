@@ -36,7 +36,7 @@ CATEGORIES = [
     ('noise', 'Noise', 'Random and sparse sources.'),
     ('filter', 'Filters', 'Tone shaping.'),
     ('mod', 'Modulation', 'Envelopes, LFOs, clocks, sequencers.'),
-    ('util', 'Utilities', 'Rescale and multiply control signals.'),
+    ('util', 'Utilities', 'Rescale, mix, multiply, and values set from code.'),
     ('dynamics', 'Dynamics', 'Gates, followers, compressors.'),
     ('fx', 'Effects', 'Delays, reverbs, choruses, distortion.'),
     ('physical', 'Physical models', 'Strings, resonators, tubes.'),

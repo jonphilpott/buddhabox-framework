@@ -1,0 +1,25 @@
+{
+  "modules": {
+    "note": {"type": "Param", "set": {"setValue": 220}},
+    "strike": {"type": "Param"},
+    "vibrato": {"type": "LFO", "set": {"setFrequency": 5}},
+    "osc": {
+      "type": "Oscillator",
+      "set": {"setWaveform": "Waveform::TRIANGLE", "setAmplitude": 0.6}
+    },
+    "env": {"type": "Envelope", "set": {"setAttack": 0.005, "setRelease": 0.4}},
+    "vca": {"type": "Multiply"}
+  },
+  "wires": [
+    ["note.out", "osc.setFrequency"],
+    ["vibrato.out", "osc.setFrequency", {"amount": 3}],
+    ["strike.out", "env.trigger"],
+    ["osc.out", "vca.a"],
+    ["env.out", "vca.b"],
+    ["vca.out", "out.left"],
+    ["vca.out", "out.right"]
+  ],
+  "ui": {"pos": {"note": [24, 24], "strike": [24, 228], "vibrato": [24, 120],
+                 "osc": [264, 24], "env": [264, 204], "vca": [504, 96],
+                 "out": [744, 96]}}
+}

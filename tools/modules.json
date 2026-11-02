@@ -2087,6 +2087,48 @@
   "ram": 60,
   "ram_size": null
  },
+ "Mixer": {
+  "header": "buddhabox/util/mixer.h",
+  "category": "util",
+  "brief": "",
+  "template": null,
+  "call": "process",
+  "returns": "float",
+  "inputs": [
+   {
+    "name": "a",
+    "type": "float",
+    "default": "0.0f"
+   },
+   {
+    "name": "b",
+    "type": "float",
+    "default": "0.0f"
+   },
+   {
+    "name": "c",
+    "type": "float",
+    "default": "0.0f"
+   },
+   {
+    "name": "d",
+    "type": "float",
+    "default": "0.0f"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "out",
+    "expr": "{id}_v_"
+   }
+  ],
+  "params": {},
+  "events": [],
+  "cycles": null,
+  "scaling": null,
+  "ram": null,
+  "ram_size": null
+ },
  "Multiply": {
   "header": "buddhabox/util/multiply.h",
   "category": "util",
@@ -2113,6 +2155,38 @@
    }
   ],
   "params": {},
+  "events": [],
+  "cycles": null,
+  "scaling": null,
+  "ram": null,
+  "ram_size": null
+ },
+ "Param": {
+  "header": "buddhabox/util/param.h",
+  "category": "util",
+  "brief": "",
+  "template": null,
+  "call": "process",
+  "returns": "float",
+  "inputs": [],
+  "outputs": [
+   {
+    "name": "out",
+    "expr": "{id}_v_"
+   }
+  ],
+  "params": {
+   "setValue": {
+    "args": [
+     {
+      "name": "v",
+      "type": "float",
+      "default": null
+     }
+    ],
+    "cycles": null
+   }
+  },
   "events": [],
   "cycles": null,
   "scaling": null,
