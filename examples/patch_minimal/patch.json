@@ -1,0 +1,16 @@
+{
+  "modules": {
+    "osc": {
+      "type": "Oscillator",
+      "set": {
+        "setWaveform": "Waveform::SINE",
+        "setFrequency": 220,
+        "setAmplitude": 0.5
+      }
+    }
+  },
+  "wires": [
+    ["osc.out", "out.left"],
+    ["osc.out", "out.right"]
+  ]
+}

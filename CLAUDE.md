@@ -21,7 +21,7 @@ The project has an educational focus: highly documented code and a
 ## Building and Running
 - **Build every example:** `pio run`
 - **Build one:** `pio run -e singing_bowls` (envs: minimal, singing_bowls,
-  drum_machine, custom_voice, compile_all, profile, profile_all)
+  drum_machine, custom_voice, compile_all, profile, profile_all, patch_minimal)
 - **Upload:** `pio run -e <env> -t upload` (DFU: hold BOOT0, tap NRST, release BOOT0)
 - **Serial Monitor:** `pio device monitor` (examples print `AudioEngine::cpuLoad()`)
 - **Measure CPU:** `pio run -e profile -t upload` prints cycles per sample per module
@@ -35,6 +35,9 @@ The project has an educational focus: highly documented code and a
 - **New project:** `python3 tools/new_project.py ../my_synth [--example custom_voice]`
 - **Regenerate tables:** see `tools/gen_tables.cpp` header
 - **Regenerate docs:** `python3 tools/gen_docs.py`
+- **Module list:** `python3 tools/gen_modules.py` (after changing a module's
+  API, or after pasting new `profile_all` output into `tools/costs.csv`)
+- **Generate a patch:** `python3 tools/gen_patch.py examples/patch_minimal/patch.json`
 
 ## Hardware Specifications
 - **I2S Pins:** `PB12` (LRCLK), `PB13` (BCLK), `PB15` (DIN)
@@ -55,6 +58,10 @@ The project has an educational focus: highly documented code and a
 - `tools/new_project.py` — creates a project linked to this checkout
 - `tools/gen_docs.py` — writes `docs/reference.html` and fills the catalogue
   and code listings in `docs/index.html`
+- `tools/gen_modules.py` — writes `tools/modules.json` (each module's inputs,
+  outputs, setters and cost) from the headers and `tools/costs.csv`
+- `tools/gen_patch.py` — turns a `patch.json` into `patch_graph.h` (never edit
+  by hand), plus a starter `main.cpp` if there is none
 
 ### DSP Module Pattern
 - **Sample-by-Sample:** every module exposes a `process()` that handles one sample.

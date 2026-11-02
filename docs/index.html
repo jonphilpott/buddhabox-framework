@@ -819,6 +819,57 @@ pio device monitor</code></pre>
 <p>Template sizes are small so that everything fits in RAM at once; buffer
 size changes RAM, not cycles. Tight loops stay in the flash accelerator's
 cache, so the figures are slightly optimistic for a full patch.</p>
+<h3>patch_minimal: a patch generated from JSON</h3>
+<p>The same sine tone as <code>minimal</code>, but described in
+<code>patch.json</code> and turned into C++ by
+<code>tools/gen_patch.py</code>. This is the first step towards a
+graphical patch editor: the tool writes the plumbing (objects, starting
+parameters, wiring in signal order) and you write the musical logic.</p>
+<div class="flow">
+  <span class="node">patch.json</span>
+  <span class="arrow">&rarr;</span>
+  <span class="node mod">gen_patch.py<small>checks, sorts, costs</small></span>
+  <span class="arrow">&rarr;</span>
+  <span class="node">patch_graph.h<small>generated, never edited</small></span>
+  <span class="arrow">&larr;</span>
+  <span class="node out">main.cpp<small>yours</small></span>
+</div>
+<pre><code>{
+  "modules": {
+    "osc": {"type": "Oscillator",
+            "set": {"setWaveform": "Waveform::SINE",
+                    "setFrequency": 220, "setAmplitude": 0.5}}
+  },
+  "wires": [["osc.out", "out.left"], ["osc.out", "out.right"]]
+}</code></pre>
+<pre><code>python3 tools/gen_patch.py examples/patch_minimal/patch.json
+pio run -e patch_minimal -t upload</code></pre>
+<table>
+  <tr><th>Key</th><th>Meaning</th></tr>
+  <tr><td><code>type</code></td><td>Any class in <code>tools/modules.json</code></td></tr>
+  <tr><td><code>template</code></td><td>Template arguments, e.g. <code>"8192"</code> for <code>Reverb&lt;8192&gt;</code>; omitted means the default</td></tr>
+  <tr><td><code>set</code></td><td>Setters called once in <code>patch::setup()</code>; a list passes several arguments (<code>"setFrequency": [800, 0.7]</code>)</td></tr>
+  <tr><td><code>wires</code></td><td><code>["module.output", "module.input"]</code>; <code>out.left</code> and <code>out.right</code> are the speakers</td></tr>
+</table>
+<p>Several wires into one input are summed; an unwired input gets its
+default, or 0. A float wired into a <code>bool</code> input (a gate or
+clock) counts as true above 0.5. Wires may not form a loop. The tool
+prints the patch's estimated CPU and RAM, from the measured costs above,
+and warns above 80% of the CPU.</p>
+<p><code>patch_graph.h</code> puts every module in
+<code>namespace patch</code>, so <code>main.cpp</code> reaches them as
+<code>patch::osc</code>. The tool writes <code>main.cpp</code> only if it
+does not exist, so your code there is never overwritten.</p>
+<p>Each module's inputs, outputs and setters come from
+<code>tools/modules.json</code>, which <code>tools/gen_modules.py</code>
+reads from the headers: <code>process()</code> arguments are inputs; its
+return value (or each field of a returned struct, or
+<code>left</code>/<code>right</code> for stereo effects) is an output, as
+is each <code>float name() const</code> getter; each
+<code>setX()</code> is a setter. Costs come from
+<code>tools/costs.csv</code>, the saved output of
+<code>profile_all</code>. Rerun <code>gen_modules.py</code> after changing
+a module's API or re-profiling.</p>
 </section>
 
 <!-- ───────────────────────────────────────────────────────────────── -->

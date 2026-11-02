@@ -1,0 +1,83 @@
+module,header,cycles_per_sample,ram_bytes,pct_of_budget
+Oscillator,osc/oscillator.h,30.6,20,1.60
+LFO,osc/lfo.h,45.0,24,2.36
+SineOscillator,osc/sine.h,19.0,12,1.00
+SineOscillator (sine and cosine),osc/sine.h,39.0,12,2.05
+BasicOscillator,osc/basic.h,43.0,36,2.26
+VariableShapeOscillator,osc/variable_shape.h,106.3,40,5.58
+FormantOscillator,osc/formant.h,40.5,28,2.13
+VosimOscillator,osc/vosim.h,97.0,32,5.09
+GrainletOscillator,osc/grainlet.h,99.0,32,5.20
+ZOscillator,osc/z_osc.h,124.0,36,6.51
+HarmonicOscillator,osc/harmonic.h,49.3,272,2.59
+StringSynthOscillator,osc/string_synth.h,44.0,76,2.31
+WhiteNoise,noise/noise.h,0.0,4,0.00
+PinkNoise,noise/noise.h,58.0,60,3.04
+LFSR,core/random.h,5.0,4,0.26
+Dust,noise/dust.h,6.0,20,0.32
+Particle,noise/particle.h,51.2,64,2.69
+ClockedNoise,noise/clocked_noise.h,21.0,24,1.10
+SmoothRandom,noise/smooth_random.h,12.0,24,0.63
+SVFilter,filter/sv_filter.h,6.0,28,0.32
+Svf,filter/svf.h,18.0,28,0.95
+MoogFilter,filter/moog_filter.h,44.0,28,2.31
+OnePole,filter/one_pole.h,13.0,16,0.68
+DcBlocker,filter/dc_blocker.h,5.0,12,0.26
+VowelFilter,filter/vowel.h,199.0,176,10.45
+Hilbert,filter/hilbert.h,258.0,212,13.55
+AllpassFilter<512>,filter/allpass.h,67.0,1036,3.52
+Envelope,mod/envelope.h,8.7,20,0.45
+SegmentEnvelope,mod/segment_envelope.h,75.0,108,3.94
+Slope,mod/slope.h,215.0,60,11.29
+SlewLimiter,mod/slew.h,12.0,12,0.63
+Lag,mod/lag.h,58.5,16,3.07
+SampleAndHold,mod/sample_and_hold.h,0.0,4,0.00
+TempoClock,mod/clock.h,0.2,20,0.01
+ClockToRamp,mod/clock_to_ramp.h,22.2,320,1.17
+Lorenz,mod/lorenz.h,16.0,24,0.84
+BouncingBall,mod/bouncing_ball.h,15.0,36,0.79
+RandomSequence,mod/random_sequence.h,37.0,84,1.94
+Quantizer,mod/quantizer.h,186.5,204,9.79
+HysteresisQuantizer,mod/hysteresis_quantizer.h,22.0,20,1.16
+LowPassGate,dynamics/low_pass_gate.h,47.0,20,2.47
+Vactrol,dynamics/vactrol.h,131.1,76,6.88
+VactrolLpg,dynamics/vactrol_lpg.h,90.0,72,4.73
+Follower,dynamics/follower.h,141.9,92,7.45
+Compressor,dynamics/compressor.h,158.0,44,8.30
+DelayLine<1024> (write and read),fx/delay.h,51.0,2050,2.68
+Reverb<4096> (stereo),fx/reverb.h,509.5,8392,26.75
+Chorus<2048> (stereo),fx/chorus.h,258.5,4188,13.57
+Ensemble<4096> (stereo),fx/ensemble.h,389.8,8292,20.47
+Diffuser<2048> (stereo),fx/diffuser.h,354.3,4224,18.60
+PitchShifter<2048>,fx/pitch_shifter.h,132.4,4192,6.95
+Decimator,fx/decimator.h,22.2,28,1.16
+Limiter (stereo),fx/limiter.h,103.0,16,5.41
+Limiter (stereo idle),fx/limiter.h,38.0,16,2.00
+Overdrive,fx/overdrive.h,114.0,12,5.99
+WaveFolder,fx/wave_folder.h,8.0,4,0.42
+TableWavefolder,fx/table_wavefolder.h,74.2,8,3.89
+KarplusStrong<512>,physical/karplus.h,15.0,1048,0.79
+ModalResonator (12 modes),physical/modal_resonator.h,704.0,2184,36.96
+ModalResonator (24 modes),physical/modal_resonator.h,1293.5,2184,67.91
+ModalResonator<64> (12 modes bowed),physical/modal_resonator.h,1294.4,4200,67.96
+StringModel<512>,physical/string_model.h,420.1,3268,22.05
+Plucker,physical/plucker.h,76.0,1092,3.99
+Tube<512>,physical/tube.h,63.5,2100,3.33
+AnalogKick,drums/analog_kick.h,234.9,136,12.33
+AnalogSnare,drums/analog_snare.h,442.1,340,23.21
+HiHat,drums/hihat.h,177.2,412,9.30
+SynthKick,drums/synth_kick.h,248.9,188,13.07
+SynthSnare,drums/synth_snare.h,203.0,152,10.66
+FmDrum,drums/fm_drum.h,130.1,80,6.83
+FmOperators,spectral/fm_operators.h,409.3,148,21.49
+Xmod::morph,spectral/xmod.h,90.0,0,4.73
+Oscillator.setFrequency,osc/oscillator.h,21.0,0,1.10
+SVFilter.setFrequency,filter/sv_filter.h,95.0,0,4.99
+Svf.setFrequency (exact tan),filter/svf.h,170.0,0,8.93
+Svf.setCoefficients (fast tan),filter/svf.h,56.0,0,2.94
+MoogFilter.setFrequency,filter/moog_filter.h,183.0,0,9.61
+OnePole.setFrequency,filter/one_pole.h,164.0,0,8.61
+HarmonicOscillator.setFrequency,osc/harmonic.h,40.0,0,2.10
+StringSynthOscillator.setFrequency,osc/string_synth.h,103.0,0,5.41
+Tube.setFrequency,physical/tube.h,64.0,0,3.36
+FmOperators.setFrequency,spectral/fm_operators.h,161.0,0,8.45

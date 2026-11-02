@@ -58,11 +58,11 @@ void loop() {}
   `filter`, `mod`, `dynamics`, `fx`, `physical`, `drums`, `spectral`
 - `src/buddhabox.h` — includes everything
 - `examples/` — `minimal`, `singing_bowls`, `drum_machine`, `custom_voice`,
-  `compile_all`, `profile`, `profile_all` (each is a `pio run -e <name>` environment)
+  `compile_all`, `profile`, `profile_all`, `patch_minimal` (each is a `pio run -e <name>` environment)
 - `docs/index.html` — guide: wiring, conventions, budgets, composition
 - `docs/reference.html` — full API, generated from the docstrings
 - `tests/compare_partials.cpp` — checks every port against Partials
-- `tools/` — project, table and documentation generators
+- `tools/` — project, table, documentation and patch generators
 
 ## Commands
 
@@ -74,6 +74,7 @@ void loop() {}
 - `pio run -e profile_all -t upload` — the same for every audio module, as CSV
 - `python3 tools/new_project.py ../my_synth` — start a new project
 - `python3 tools/gen_docs.py` — regenerate the reference after editing docstrings
+- `python3 tools/gen_patch.py path/patch.json` — generate a patch's C++ from JSON
 
 ## Licence
 
