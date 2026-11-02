@@ -320,30 +320,134 @@ with <code>AudioEngine::cpuLoad()</code>.</p>
 <p>Everything else uses under 0.5 KB.</p>
 
 <h3>Measured CPU cost</h3>
-<p>Measured on a Black Pill at 84 MHz with the <code>profile</code>
-example (GCC 9, <code>-O2</code>), averaged over 4,096 samples. The
-budget is 1,905 cycles per sample; keep a patch below about 80%, roughly
-1,500 cycles, to leave room for USB and <code>loop()</code>. Modules not
-listed have not been measured yet: add them to the profiler.</p>
+<p>Measured on a Black Pill at 84 MHz with the <code>profile_all</code>
+example (GCC 9, <code>-O2</code>), fastest of five runs of 4,096 samples,
+loop overhead removed. Inputs are full-scale white noise; drums, plucks and
+envelopes are kept sounding. The budget is 1,905 cycles per sample; keep a
+patch below about 80%, roughly 1,500 cycles, to leave room for USB and
+<code>loop()</code>. RAM is <code>sizeof()</code> at the template size
+shown; a smaller buffer saves RAM, not cycles.</p>
 <table>
-  <tr><th>Module</th><th>Cycles per sample</th><th>Share of the CPU</th></tr>
-  <tr><td><code>ModalResonator</code>, 8 modes</td><td>511</td><td>26.8%</td></tr>
-  <tr><td><code>ModalResonator</code>, 16 modes</td><td>894</td><td>46.9%</td></tr>
-  <tr><td><code>ModalResonator</code>, 24 modes (default)</td><td>1,282</td><td>67.3%</td></tr>
-  <tr><td><code>Reverb&lt;16384&gt;</code></td><td>483</td><td>25.4%</td></tr>
-  <tr><td><code>Hilbert</code></td><td>235</td><td>12.3%</td></tr>
-  <tr><td><code>Particle</code></td><td>63</td><td>3.3%</td></tr>
-  <tr><td><code>StringSynthOscillator</code></td><td>60</td><td>3.2%</td></tr>
-  <tr><td><code>Limiter</code> (stereo)</td><td>50</td><td>2.6%</td></tr>
-  <tr><td><code>SineOscillator</code> (sine and cosine)</td><td>43</td><td>2.2%</td></tr>
-  <tr><td><code>Svf</code></td><td>26</td><td>1.3%</td></tr>
-  <tr><td><code>Lorenz</code></td><td>25</td><td>1.3%</td></tr>
-  <tr><td><code>Dust</code></td><td>15</td><td>0.8%</td></tr>
+  <tr><th>Module</th><th>Cycles per sample</th><th>Share of the CPU</th><th>RAM</th></tr>
+  <tr><th colspan="4">Oscillators</th></tr>
+  <tr><td><code>Oscillator</code></td><td>31</td><td>1.6%</td><td>20 B</td></tr>
+  <tr><td><code>LFO</code></td><td>45</td><td>2.4%</td><td>24 B</td></tr>
+  <tr><td><code>SineOscillator</code></td><td>19</td><td>1.0%</td><td>12 B</td></tr>
+  <tr><td><code>SineOscillator</code> (sine and cosine)</td><td>39</td><td>2.0%</td><td>12 B</td></tr>
+  <tr><td><code>BasicOscillator</code></td><td>43</td><td>2.3%</td><td>36 B</td></tr>
+  <tr><td><code>VariableShapeOscillator</code></td><td>106</td><td>5.6%</td><td>40 B</td></tr>
+  <tr><td><code>FormantOscillator</code></td><td>40</td><td>2.1%</td><td>28 B</td></tr>
+  <tr><td><code>VosimOscillator</code></td><td>97</td><td>5.1%</td><td>32 B</td></tr>
+  <tr><td><code>GrainletOscillator</code></td><td>99</td><td>5.2%</td><td>32 B</td></tr>
+  <tr><td><code>ZOscillator</code></td><td>124</td><td>6.5%</td><td>36 B</td></tr>
+  <tr><td><code>HarmonicOscillator</code></td><td>49</td><td>2.6%</td><td>272 B</td></tr>
+  <tr><td><code>StringSynthOscillator</code></td><td>44</td><td>2.3%</td><td>76 B</td></tr>
+  <tr><th colspan="4">Noise and random</th></tr>
+  <tr><td><code>WhiteNoise</code></td><td>under 5</td><td>under 0.3%</td><td>4 B</td></tr>
+  <tr><td><code>PinkNoise</code></td><td>58</td><td>3.0%</td><td>60 B</td></tr>
+  <tr><td><code>LFSR</code></td><td>5</td><td>0.3%</td><td>4 B</td></tr>
+  <tr><td><code>Dust</code></td><td>6</td><td>0.3%</td><td>20 B</td></tr>
+  <tr><td><code>Particle</code></td><td>51</td><td>2.7%</td><td>64 B</td></tr>
+  <tr><td><code>ClockedNoise</code></td><td>21</td><td>1.1%</td><td>24 B</td></tr>
+  <tr><td><code>SmoothRandom</code></td><td>12</td><td>0.6%</td><td>24 B</td></tr>
+  <tr><th colspan="4">Filters</th></tr>
+  <tr><td><code>SVFilter</code></td><td>6</td><td>0.3%</td><td>28 B</td></tr>
+  <tr><td><code>Svf</code></td><td>18</td><td>0.9%</td><td>28 B</td></tr>
+  <tr><td><code>MoogFilter</code></td><td>44</td><td>2.3%</td><td>28 B</td></tr>
+  <tr><td><code>OnePole</code></td><td>13</td><td>0.7%</td><td>16 B</td></tr>
+  <tr><td><code>DcBlocker</code></td><td>5</td><td>0.3%</td><td>12 B</td></tr>
+  <tr><td><code>VowelFilter</code></td><td>199</td><td>10.4%</td><td>176 B</td></tr>
+  <tr><td><code>Hilbert</code></td><td>258</td><td>13.6%</td><td>212 B</td></tr>
+  <tr><td><code>AllpassFilter&lt;512&gt;</code></td><td>67</td><td>3.5%</td><td>1.0 KB</td></tr>
+  <tr><th colspan="4">Modulation</th></tr>
+  <tr><td><code>Envelope</code></td><td>9</td><td>0.5%</td><td>20 B</td></tr>
+  <tr><td><code>SegmentEnvelope</code></td><td>75</td><td>3.9%</td><td>108 B</td></tr>
+  <tr><td><code>Slope</code></td><td>215</td><td>11.3%</td><td>60 B</td></tr>
+  <tr><td><code>SlewLimiter</code></td><td>12</td><td>0.6%</td><td>12 B</td></tr>
+  <tr><td><code>Lag</code></td><td>58</td><td>3.1%</td><td>16 B</td></tr>
+  <tr><td><code>SampleAndHold</code></td><td>under 5</td><td>under 0.3%</td><td>4 B</td></tr>
+  <tr><td><code>TempoClock</code></td><td>under 5</td><td>under 0.3%</td><td>20 B</td></tr>
+  <tr><td><code>ClockToRamp</code></td><td>22</td><td>1.2%</td><td>320 B</td></tr>
+  <tr><td><code>Lorenz</code></td><td>16</td><td>0.8%</td><td>24 B</td></tr>
+  <tr><td><code>BouncingBall</code></td><td>15</td><td>0.8%</td><td>36 B</td></tr>
+  <tr><td><code>RandomSequence</code></td><td>37</td><td>1.9%</td><td>84 B</td></tr>
+  <tr><td><code>Quantizer</code></td><td>186</td><td>9.8%</td><td>204 B</td></tr>
+  <tr><td><code>HysteresisQuantizer</code></td><td>22</td><td>1.2%</td><td>20 B</td></tr>
+  <tr><th colspan="4">Dynamics</th></tr>
+  <tr><td><code>LowPassGate</code></td><td>47</td><td>2.5%</td><td>20 B</td></tr>
+  <tr><td><code>Vactrol</code></td><td>131</td><td>6.9%</td><td>76 B</td></tr>
+  <tr><td><code>VactrolLpg</code></td><td>90</td><td>4.7%</td><td>72 B</td></tr>
+  <tr><td><code>Follower</code></td><td>142</td><td>7.5%</td><td>92 B</td></tr>
+  <tr><td><code>Compressor</code></td><td>158</td><td>8.3%</td><td>44 B</td></tr>
+  <tr><th colspan="4">Effects</th></tr>
+  <tr><td><code>DelayLine&lt;1024&gt;</code> (write and read)</td><td>51</td><td>2.7%</td><td>2.0 KB</td></tr>
+  <tr><td><code>Reverb&lt;4096&gt;</code> (stereo)</td><td>510</td><td>26.8%</td><td>8.2 KB</td></tr>
+  <tr><td><code>Chorus&lt;2048&gt;</code> (stereo)</td><td>258</td><td>13.6%</td><td>4.1 KB</td></tr>
+  <tr><td><code>Ensemble&lt;4096&gt;</code> (stereo)</td><td>390</td><td>20.5%</td><td>8.1 KB</td></tr>
+  <tr><td><code>Diffuser&lt;2048&gt;</code> (stereo)</td><td>354</td><td>18.6%</td><td>4.1 KB</td></tr>
+  <tr><td><code>PitchShifter&lt;2048&gt;</code></td><td>132</td><td>7.0%</td><td>4.1 KB</td></tr>
+  <tr><td><code>Decimator</code></td><td>22</td><td>1.2%</td><td>28 B</td></tr>
+  <tr><td><code>Limiter</code> (stereo)</td><td>103</td><td>5.4%</td><td>16 B</td></tr>
+  <tr><td><code>Limiter</code> (stereo idle)</td><td>38</td><td>2.0%</td><td>16 B</td></tr>
+  <tr><td><code>Overdrive</code></td><td>114</td><td>6.0%</td><td>12 B</td></tr>
+  <tr><td><code>WaveFolder</code></td><td>8</td><td>0.4%</td><td>4 B</td></tr>
+  <tr><td><code>TableWavefolder</code></td><td>74</td><td>3.9%</td><td>8 B</td></tr>
+  <tr><th colspan="4">Physical models</th></tr>
+  <tr><td><code>KarplusStrong&lt;512&gt;</code></td><td>15</td><td>0.8%</td><td>1.0 KB</td></tr>
+  <tr><td><code>ModalResonator</code> (12 modes)</td><td>704</td><td>37.0%</td><td>2.1 KB</td></tr>
+  <tr><td><code>ModalResonator</code> (24 modes)</td><td>1,294</td><td>67.9%</td><td>2.1 KB</td></tr>
+  <tr><td><code>ModalResonator&lt;64&gt;</code> (12 modes bowed)</td><td>1,294</td><td>68.0%</td><td>4.1 KB</td></tr>
+  <tr><td><code>StringModel&lt;512&gt;</code></td><td>420</td><td>22.1%</td><td>3.2 KB</td></tr>
+  <tr><td><code>Plucker</code></td><td>76</td><td>4.0%</td><td>1.1 KB</td></tr>
+  <tr><td><code>Tube&lt;512&gt;</code></td><td>64</td><td>3.3%</td><td>2.1 KB</td></tr>
+  <tr><th colspan="4">Drums</th></tr>
+  <tr><td><code>AnalogKick</code></td><td>235</td><td>12.3%</td><td>136 B</td></tr>
+  <tr><td><code>AnalogSnare</code></td><td>442</td><td>23.2%</td><td>340 B</td></tr>
+  <tr><td><code>HiHat</code></td><td>177</td><td>9.3%</td><td>412 B</td></tr>
+  <tr><td><code>SynthKick</code></td><td>249</td><td>13.1%</td><td>188 B</td></tr>
+  <tr><td><code>SynthSnare</code></td><td>203</td><td>10.7%</td><td>152 B</td></tr>
+  <tr><td><code>FmDrum</code></td><td>130</td><td>6.8%</td><td>80 B</td></tr>
+  <tr><th colspan="4">Spectral</th></tr>
+  <tr><td><code>FmOperators</code></td><td>409</td><td>21.5%</td><td>148 B</td></tr>
+  <tr><td><code>Xmod::morph</code></td><td>90</td><td>4.7%</td><td>&ndash;</td></tr>
+  <tr><th colspan="4">Setters (cost per call)</th></tr>
+  <tr><td><code>Oscillator.setFrequency</code></td><td>21</td><td>1.1%</td><td>&ndash;</td></tr>
+  <tr><td><code>SVFilter.setFrequency</code></td><td>95</td><td>5.0%</td><td>&ndash;</td></tr>
+  <tr><td><code>Svf.setFrequency</code> (exact tan)</td><td>170</td><td>8.9%</td><td>&ndash;</td></tr>
+  <tr><td><code>Svf.setCoefficients</code> (fast tan)</td><td>56</td><td>2.9%</td><td>&ndash;</td></tr>
+  <tr><td><code>MoogFilter.setFrequency</code></td><td>183</td><td>9.6%</td><td>&ndash;</td></tr>
+  <tr><td><code>OnePole.setFrequency</code></td><td>164</td><td>8.6%</td><td>&ndash;</td></tr>
+  <tr><td><code>HarmonicOscillator.setFrequency</code></td><td>40</td><td>2.1%</td><td>&ndash;</td></tr>
+  <tr><td><code>StringSynthOscillator.setFrequency</code></td><td>103</td><td>5.4%</td><td>&ndash;</td></tr>
+  <tr><td><code>Tube.setFrequency</code></td><td>64</td><td>3.4%</td><td>&ndash;</td></tr>
+  <tr><td><code>FmOperators.setFrequency</code></td><td>161</td><td>8.4%</td><td>&ndash;</td></tr>
 </table>
-<p>The resonator costs about 127 cycles plus 48 per mode, so 24 modes
-alone use two-thirds of the CPU. 12&ndash;16 modes is plenty for bells
-and bowls. Reverb cost does not depend on its size: a smaller buffer
-saves RAM, not cycles.</p>
+<p><strong>Treat these as estimates within about &plusmn;15%.</strong> The
+same module costs slightly different amounts in different programs,
+because the compiler inlines and lays out code differently each time.
+Check a real patch with <code>AudioEngine::cpuLoad()</code>.</p>
+<p><strong>The resonator dominates.</strong> It costs about 115 cycles plus
+49 per mode, so 24 modes alone use two-thirds of the CPU. 12&ndash;16 modes
+is plenty for bells and bowls.</p>
+<p><strong>Some modules cost more when they work harder.</strong> The
+limiter costs about 40 cycles when the signal is below its threshold and
+about 100 while it is limiting. Reverb costs about 5% more with loud
+input than quiet. Budget for the busy figure.</p>
+<p><strong>Modulating a parameter costs its setter, every time.</strong>
+Most setters that change a filter's cutoff use <code>tanf()</code> or
+similar maths, and cost several times the filter itself:
+<code>Svf::process()</code> is 18 cycles, <code>Svf::setFrequency()</code>
+170. Update such parameters at control rate, for example once every 32
+samples, which brings a 170-cycle setter down to about 5 cycles per
+sample. Where a fast form exists, use it:
+<code>setCoefficients(..., TanApprox::Fast)</code> is 56 cycles.</p>
+<p><strong>Large patches can stop the compiler inlining.</strong> GCC
+stops inlining into a function once it passes a size limit. A very large
+<code>audioCallback()</code> could then call big modules instead of
+inlining them, which made some modules up to 2.5&times; slower in testing.
+If <code>cpuLoad()</code> is well above the sum of these figures, move
+groups of modules into voice classes (see below), which keeps each
+function small.</p>
 
 <h3>What the examples use</h3>
 <table>
@@ -693,6 +797,28 @@ profiler reports regardless. The modules are set up as in
 Copy its <code>PROFILE()</code> macro to time your own code.</p>
 <pre><code>pio run -e profile -t upload
 pio device monitor</code></pre>
+
+<h3>profile_all</h3>
+<p>Measures every audio module, plus the setters a patch calls when it
+modulates a parameter, and prints CSV for tools such as a patch editor to
+read. It refines <code>profile</code> in four ways: interrupts are off
+while timing, each module keeps the fastest of five runs, the cost of the
+empty loop is subtracted, and each module is timed in its own small
+function so the compiler inlines it as it would in a real patch. Drums and plucks are re-struck and envelopes
+re-gated every 2,048 samples, so each module is timed while it sounds.</p>
+<pre><code>pio run -e profile_all -t upload
+pio device monitor</code></pre>
+<table>
+  <tr><th>Column</th><th>Meaning</th></tr>
+  <tr><td><code>module</code></td><td>Class, with the template size used</td></tr>
+  <tr><td><code>header</code></td><td>Path under <code>src/buddhabox</code>, to match rows to the reference</td></tr>
+  <tr><td><code>cycles_per_sample</code></td><td>Cost per <code>process()</code> call, loop overhead removed</td></tr>
+  <tr><td><code>ram_bytes</code></td><td><code>sizeof()</code> the object at that template size</td></tr>
+  <tr><td><code>pct_of_budget</code></td><td>Share of the 1,905-cycle budget</td></tr>
+</table>
+<p>Template sizes are small so that everything fits in RAM at once; buffer
+size changes RAM, not cycles. Tight loops stay in the flash accelerator's
+cache, so the figures are slightly optimistic for a full patch.</p>
 </section>
 
 <!-- ───────────────────────────────────────────────────────────────── -->

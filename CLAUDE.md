@@ -21,11 +21,12 @@ The project has an educational focus: highly documented code and a
 ## Building and Running
 - **Build every example:** `pio run`
 - **Build one:** `pio run -e singing_bowls` (envs: minimal, singing_bowls,
-  drum_machine, custom_voice, compile_all, profile)
+  drum_machine, custom_voice, compile_all, profile, profile_all)
 - **Upload:** `pio run -e <env> -t upload` (DFU: hold BOOT0, tap NRST, release BOOT0)
 - **Serial Monitor:** `pio device monitor` (examples print `AudioEngine::cpuLoad()`)
 - **Measure CPU:** `pio run -e profile -t upload` prints cycles per sample per module
-  (works even when a patch is over budget)
+  (works even when a patch is over budget); `-e profile_all` covers every audio
+  module and prints CSV with RAM per object
 - **Overrun LED:** the engine lights the blue LED (PC13) when a block runs
   late; `-D BB_OVERRUN_LED=0` turns it off (needed with `UserLED`)
 - **Build flags:** keep `build_unflags = -Os`; the STM32 core appends `-Os`,

@@ -58,7 +58,7 @@ void loop() {}
   `filter`, `mod`, `dynamics`, `fx`, `physical`, `drums`, `spectral`
 - `src/buddhabox.h` — includes everything
 - `examples/` — `minimal`, `singing_bowls`, `drum_machine`, `custom_voice`,
-  `compile_all`, `profile` (each is a `pio run -e <name>` environment)
+  `compile_all`, `profile`, `profile_all` (each is a `pio run -e <name>` environment)
 - `docs/index.html` — guide: wiring, conventions, budgets, composition
 - `docs/reference.html` — full API, generated from the docstrings
 - `tests/compare_partials.cpp` — checks every port against Partials
@@ -71,6 +71,7 @@ void loop() {}
 - `pio device monitor` — the examples print their CPU load; the blue LED
   lights if the audio ever overruns (`-D BB_OVERRUN_LED=0` turns that off)
 - `pio run -e profile -t upload` — measure each module's cycles per sample
+- `pio run -e profile_all -t upload` — the same for every audio module, as CSV
 - `python3 tools/new_project.py ../my_synth` — start a new project
 - `python3 tools/gen_docs.py` — regenerate the reference after editing docstrings
 
