@@ -2,8 +2,8 @@
 // Do not edit: change the patch and rerun
 //   python3 tools/gen_patch.py examples/patch_param/patch.json
 //
-// Rough estimate: CPU 85 of 1905 cycles per sample (4%), RAM 6168
-// of 65536 bytes. Real CPU can be well above this (patch_demo: 75%
+// Rough estimate: CPU 86 of 2177 cycles per sample (3%), RAM 6185
+// of 131072 bytes. Real CPU can be well above this (patch_demo: 75%
 // estimated, 98% measured); check cpuLoad() on the board.
 //
 // Include this file from one .cpp only: it defines the module

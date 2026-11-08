@@ -131,7 +131,7 @@ public:
   float readLDR() const {
     float r = 1 - (read() * 5);
 
-    float adj = r < 0.0f ? 0.0f : (r * 2.75);
+    float adj = r < 0.0f ? 0.0f : (r * 2.75f);
     adj = adj > 1.0f ? 1.0f : adj;
     return adj;
   }

@@ -21,10 +21,10 @@
  *   driven by a nonlinear "bow table" (Elements' banded waveguides), so a
  *   continuous bow pressure gives a sustained, scratchy tone.
  *
- * COST ON THE BLACK PILL (84 MHz, 1905 cycles per sample in total),
- * measured with the profile example: about 127 cycles plus 48 per mode
- * per sample, filter updates included. 8 modes take 511 cycles (27% of
- * the CPU), 16 take 894 (47%) and the default 24 take 1282 (67%), so
+ * COST ON THE BLACK PILL, measured on the 84 MHz F401 with the profile
+ * example: about 127 cycles plus 48 per mode per sample, filter updates
+ * included. Of the F411's 2177 cycles per sample, 8 modes take 511
+ * (23%), 16 take 894 (41%) and the default 24 take 1282 (59%), so
  * call setModes(): 12-16 is plenty for bells and bowls. Rings runs up
  * to 64 modes, but on a 168 MHz chip.
  *

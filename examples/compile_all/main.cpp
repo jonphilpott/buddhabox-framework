@@ -41,6 +41,7 @@ KarplusStrong<512> karplus;
 AnalogInput pot(PA0);
 SwitchInput button(PB3);
 UserLED led;
+Oled oled;
 
 // ── Oscillators ─────────────────────────────────────────────────────────
 SineOscillator sine;
@@ -183,4 +184,9 @@ void loop() {
   pot.update();
   button.update();
   led.update();
+  oled.clear();
+  oled.rect(0, 0, 128, 8, true);
+  oled.number(oled.text(0, 16, "x "), 16, pot.read(), 2);
+  oled.line(0, 63, 127, 32);
+  oled.display();
 }

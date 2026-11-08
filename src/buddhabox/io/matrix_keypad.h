@@ -35,7 +35,7 @@
  * HIGH (not being scanned), the diode at any (R0,*) key is
  * reverse-biased, so no ghost current can flow.
  *
- * WIRING (STM32F401CC Black Pill — I2C-safe pin assignment):
+ * WIRING (Black Pill — I2C-safe pin assignment):
  * ────────────────────────────────────────────────────────────────────
  *   Row pins   : PA3, PA4, PA5, PA6, PA7
  *   Column pins: PB0, PB1, PB4, PB5, PB14

@@ -2,7 +2,7 @@
  * @file led.h
  * @brief Driver for the onboard user LED (PC13) on the Black Pill.
  *
- * The STM32F401CC Black Pill has a single user-controllable LED wired to
+ * The Black Pill (F411CE or F401CC) has a single user-controllable LED wired to
  * pin PC13. The LED is ACTIVE LOW: driving the pin LOW turns it ON, and
  * driving it HIGH turns it OFF. This is a common STM32 board convention
  * — the LED cathode connects to the GPIO pin, and the anode is pulled to

@@ -66,7 +66,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODULES = os.path.join(ROOT, 'tools', 'modules.json')
 
-BUDGET = round(84e6 / 44100)  # CPU cycles per sample: 1905
+BUDGET = round(96e6 / 44100)  # CPU cycles per sample on the F411: 2177
 SAFE = 0.8             # warn above this share of the estimate
 # ponytail: assumed cost of a setter profile_all hasn't measured. The
 # measured ones run 20-190 cycles; measure the setter to replace this.
@@ -74,7 +74,7 @@ UNMEASURED_SETTER = 200
 # RAM used by the framework itself (engine, DMA buffers, USB): the
 # `minimal` example's 6124 bytes less its 20-byte oscillator.
 BASE_RAM = 6104
-RAM_SIZE = 65536
+RAM_SIZE = 131072  # F411; the F401 has 65536
 
 MAIN_CPP = '''/**
  * @file main.cpp

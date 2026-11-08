@@ -1,10 +1,11 @@
 # BuddhaBox
 
-A header-only audio DSP framework for the **STM32F401CC "Black Pill"** and an
+A header-only audio DSP framework for the **STM32F411CE "Black Pill"** (the
+F401CC board works too) and an
 I2S DAC (UDA1334A or MAX98357A). 79 classes: oscillators, noise, filters,
 envelopes and modulators, dynamics, effects, physical models, drums and FM,
 including ports of Mutable Instruments modules (via
-[Partials](../partials)) reworked to fit an 84 MHz Cortex-M4 with 64 KB of RAM.
+[Partials](../partials)) reworked to fit a 96 MHz Cortex-M4 with 128 KB of RAM.
 
 Every module processes one sample per `process()` call, works in floats
 normalised to ±1, and allocates nothing at run time: buffers are sized by
@@ -24,7 +25,7 @@ Or add it to an existing project's `platformio.ini`:
 ```ini
 [env:myproject]
 platform = ststm32@15.4.1
-board = blackpill_f401cc
+board = blackpill_f411ce   ; or blackpill_f401cc
 framework = arduino
 upload_protocol = dfu
 build_unflags = -Os   ; the core adds it after -O2, and it wins

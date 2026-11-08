@@ -24,8 +24,9 @@
  * the measured CPU load once a second; the engine lights the blue LED
  * if a block ever runs late.
  *
- * CPU: about 75%, measured with the profile example: the 12-mode bowl
- * is about 700 cycles per sample and the reverb about 480, of 1905.
+ * CPU: about 66% on the F411 (75% on the F401), measured with the
+ * profile example: the 12-mode bowl is about 700 cycles per sample and
+ * the reverb about 480, of 2177 (1905 on the F401).
  * Each extra mode costs about 48 cycles.
  */
 

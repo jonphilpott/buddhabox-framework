@@ -1,6 +1,6 @@
 /**
  * @file audio_engine.cpp
- * @brief I2S DMA audio output implementation for STM32F401CC + UDA1334A.
+ * @brief I2S DMA audio output implementation for STM32F411CE / F401CC + UDA1334A.
  *
  * This file contains all the low-level hardware setup for the I2S peripheral,
  * DMA controller, and GPIO pins. You shouldn't need to modify this unless
@@ -130,8 +130,8 @@ namespace AudioEngine {
 /**
  * Manually configure the I2S clock (PLLI2S).
  *
- * CRITICAL: The STM32F401 has a dedicated PLL (Phase Locked Loop) for the I2S
- * peripheral. Unlike most peripherals that run off the standard system clock,
+ * CRITICAL: The STM32F401 and F411 have a dedicated PLL (Phase Locked
+ * Loop) for the I2S peripheral. Unlike most peripherals that run off the standard system clock,
  * I2S requires this specific high-precision clock to generate the Bit Clock
  * (BCLK) and Word Select (LRCLK). If this PLL is not initialized, the I2S
  * peripheral will stay idle and never trigger DMA requests, resulting in
@@ -140,7 +140,10 @@ namespace AudioEngine {
 void configureI2SClock() {
   RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
 
-  // Configure PLLI2S to generate 44.1kHz clock.
+  // Configure PLLI2S to generate 44.1kHz clock. Its input is the 25 MHz
+  // crystal divided by the main PLL's PLLM (25 on both the F401 and F411
+  // Black Pill variants), so 1 MHz x 192 / 2 = 96 MHz on either board,
+  // and the HAL divides that down to 44.1 kHz.
   PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_I2S;
   PeriphClkInitStruct.PLLI2S.PLLI2SN = 192;
   PeriphClkInitStruct.PLLI2S.PLLI2SR = 2;

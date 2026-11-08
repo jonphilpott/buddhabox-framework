@@ -16,8 +16,9 @@
  * Usage: pio run -e profile -t upload, then pio device monitor. The
  * table repeats every few seconds.
  *
- * Budget: 84 MHz / 44.1 kHz = 1905 cycles per sample for everything,
- * of which roughly 80% (about 1500) is safe to spend on audio.
+ * Budget: 96 MHz / 44.1 kHz = 2177 cycles per sample for everything
+ * on the F411 (1905 on the 84 MHz F401), of which roughly 80% (about
+ * 1740) is safe to spend on audio.
  */
 
 #include <Arduino.h>

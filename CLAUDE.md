@@ -2,7 +2,8 @@
 
 ## Project Overview
 BuddhaBox is a general-purpose, header-only audio DSP framework for the
-**STM32F401CC "Black Pill"** microcontroller and an **I2S DAC** (UDA1334A,
+**STM32F411CE "Black Pill"** microcontroller (the F401CC board
+still works: `-e minimal_f401`) and an **I2S DAC** (UDA1334A,
 or MAX98357A). It grew out of the BuddhaBox generative ambient instrument
 (`~/git/buddhabox`, which will be rebuilt on this framework) and adds ports
 of Mutable Instruments modules from the Partials library (`~/git/partials`).
@@ -14,15 +15,15 @@ The project has an educational focus: highly documented code and a
 - **Language:** C++14 (GCC 9, `-fno-exceptions -fno-rtti`)
 - **Framework:** Arduino (STM32 core)
 - **Build System:** PlatformIO (Platform: `ststm32@15.4.1`)
-- **Hardware Platform:** STM32F401CC (84MHz ARM Cortex-M4F, 64 KB RAM, 256 KB flash)
+- **Hardware Platform:** STM32F411CE (96MHz ARM Cortex-M4F, 128 KB RAM, 512 KB flash)
 - **Audio Interface:** I2S with DMA double-buffering
-- **Sample Rate:** 44100 Hz, 256-frame blocks (~1900 CPU cycles per sample)
+- **Sample Rate:** 44100 Hz, 256-frame blocks (~2177 CPU cycles per sample)
 
 ## Building and Running
 - **Build every example:** `pio run`
 - **Build one:** `pio run -e singing_bowls` (envs: minimal, singing_bowls,
   drum_machine, custom_voice, compile_all, profile, profile_all, patch_minimal,
-  patch_demo, patch_hardware, patch_param)
+  patch_demo, patch_hardware, patch_param, minimal_f401, oled)
 - **Upload:** `pio run -e <env> -t upload` (DFU: hold BOOT0, tap NRST, release BOOT0)
 - **Serial Monitor:** `pio device monitor` (examples print `AudioEngine::cpuLoad()`)
 - **Measure CPU:** `pio run -e profile -t upload` prints cycles per sample per module
@@ -42,7 +43,9 @@ The project has an educational focus: highly documented code and a
 
 ## Hardware Specifications
 - **I2S Pins:** `PB12` (LRCLK), `PB13` (BCLK), `PB15` (DIN)
-- **ADC Pins:** `PA0` and above for analog sensors/pots
+- **Control pins:** 23 free; 10 analog (PA0-PA7, PB0, PB1), the rest
+  digital only. Full list in `docs/index.html` (Hardware) and
+  `tools/gen_modules.py`
 
 ## Architecture & Conventions
 

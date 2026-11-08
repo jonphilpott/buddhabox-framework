@@ -58,7 +58,7 @@ FOLDERS = ['osc', 'noise', 'filter', 'mod', 'util', 'dynamics', 'fx',
 # Building blocks rather than patchable modules.
 SKIP = {'FxEngine', 'DelayLine', 'Colour', 'Xmod'}
 
-# Black Pill (STM32F401CC) pins a patch may use. Taken and left out: I2S
+# Black Pill (STM32F411CE or F401CC) pins a patch may use. Taken and left out: I2S
 # (PB12, PB13, PB15), USB (PA11, PA12), the debug port (PA13, PA14), the
 # 32 kHz crystal (PC14, PC15) and BOOT1 (PB2). Only these ten reach the
 # ADC, so only they can read a knob. PA0 is also the board's KEY button.
@@ -139,8 +139,10 @@ def load_costs():
     class's first row: buffer sizes vary between rows, so a maximum would
     mix sizes."""
     cycles, ram = {}, {}
-    for line in open(COSTS).read().splitlines()[1:]:
-        if not line or line.startswith('#'):
+    # Skip blanks, '#' comments (profile_all prints the clock speed as
+    # one) and the column header, wherever they sit.
+    for line in open(COSTS).read().splitlines():
+        if not line or line.startswith(('#', 'module,')):
             continue
         # Split from the right: only the module name could hold a comma.
         module, _, c, b, _ = line.rsplit(',', 4)

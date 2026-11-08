@@ -16,7 +16,7 @@
  *
  * COST (an estimate from the instruction count; measure your patch with
  * AudioEngine::cpuLoad()): about 4 cycles per harmonic per sample, so 32
- * harmonics take roughly 130 of the ~1900 cycles available per sample.
+ * harmonics take roughly 130 of the ~2177 cycles available per sample.
  * setAmplitude() recomputes every gain: call it at control rate.
  *
  * Derived from Plaits, Copyright 2016 Emilie Gillet. MIT licence.

@@ -26,6 +26,7 @@
 #include "buddhabox/io/matrix_keypad.h"
 #include "buddhabox/io/mpr121_input.h"
 #include "buddhabox/io/mux_input.h"
+#include "buddhabox/io/oled.h"
 #include "buddhabox/io/switch_input.h"
 
 // ── osc ──

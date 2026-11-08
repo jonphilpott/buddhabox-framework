@@ -479,7 +479,7 @@ float s = g.process() * 0.5f;</code></pre>
 <p>A sum of harmonics of one pitch, each with its own amplitude. Set them from pots, envelopes, or computed spectra (organ drawbars, formants, a spectral tilt). Plaits&#x27; additive engine uses three of these.</p>
 <h5>How It Works</h5>
 <p>instead of computing 32 sines, it computes one, x = sin(phase), and gets the rest from the Chebyshev recurrence T(k+1) = 2x T(k) - T(k-1) which costs one multiply and one add per harmonic. Each harmonic&#x27;s amplitude is reduced as it nears Nyquist and silenced above it, so nothing aliases. Harmonic k comes out with a phase offset compared with sin(k*phase): that changes the waveform&#x27;s shape but not its sound.</p>
-<p>COST (an estimate from the instruction count; measure your patch with AudioEngine::cpuLoad()): about 4 cycles per harmonic per sample, so 32 harmonics take roughly 130 of the ~1900 cycles available per sample. setAmplitude() recomputes every gain: call it at control rate.</p>
+<p>COST (an estimate from the instruction count; measure your patch with AudioEngine::cpuLoad()): about 4 cycles per harmonic per sample, so 32 harmonics take roughly 130 of the ~2177 cycles available per sample. setAmplitude() recomputes every gain: call it at control rate.</p>
 <p>Derived from Plaits, Copyright 2016 Emilie Gillet. MIT licence.</p>
 <div class="module-card" id="harmonicoscillator">
 <h4>HarmonicOscillator</h4>
@@ -2906,7 +2906,7 @@ int16_t out = (int16_t)(sample * 32000.0f);</code></pre>
 <p>The sound of a struck or bowed object (string, bar, plate, bell, glass) made by summing resonant band-pass filters, one per vibration &quot;mode&quot;. Feed it a short burst (a click, noise, a pluck, Dust) and it rings. Singing bowls, gamelan, wind chimes: this is the ambient workhorse.</p>
 <h5>How It Works</h5>
 <ul><li>Each mode is an Svf band-pass tuned to one partial. Partial k sits at k * frequency * stretch, where the stretch grows with <code>structure</code>: none for a harmonic string, more for stiff bars, compressed for bells.</li><li>Each mode&#x27;s Q sets how long it rings. Higher partials lose Q faster (<code>brightness</code> controls how fast), which is how real objects behave.</li><li><code>position</code> imitates where the object is struck: mode k is weighted by 0.5 + 0.5*cos(2*pi*k*position). That is a comb filter applied directly to the mode gains instead of to the audio, which avoids flanging when position is modulated.</li><li>With bowed modes on, the first 8 modes also get a delay-line loop driven by a nonlinear &quot;bow table&quot; (Elements&#x27; banded waveguides), so a continuous bow pressure gives a sustained, scratchy tone.</li></ul>
-<p>COST ON THE BLACK PILL (84 MHz, 1905 cycles per sample in total), measured with the profile example: about 127 cycles plus 48 per mode per sample, filter updates included. 8 modes take 511 cycles (27% of the CPU), 16 take 894 (47%) and the default 24 take 1282 (67%), so call setModes(): 12-16 is plenty for bells and bowls. Rings runs up to 64 modes, but on a 168 MHz chip.</p>
+<p>COST ON THE BLACK PILL, measured on the 84 MHz F401 with the profile example: about 127 cycles plus 48 per mode per sample, filter updates included. Of the F411&#x27;s 2177 cycles per sample, 8 modes take 511 (23%), 16 take 894 (41%) and the default 24 take 1282 (59%), so call setModes(): 12-16 is plenty for bells and bowls. Rings runs up to 64 modes, but on a 168 MHz chip.</p>
 <h5>Memory</h5>
 <p>the template parameter sizes the bowed-mode delay lines (8 of them, 4 bytes per sample each). 0 (the default) disables bowing and costs nothing. They hold float, not int16_t: the bowed signal is tiny (around 0.01) and the loop resonates strongly, so 16-bit storage would leave it only ~8 bits of resolution and audibly change the tone.</p>
 <ul><li>ModalResonator&lt;512&gt;   16 KB; notes below ~86 Hz fold up an octave</li><li>ModalResonator&lt;1024&gt;  32 KB; notes below ~43 Hz fold up an octave</li></ul>
@@ -3445,7 +3445,7 @@ sensor.setAlpha(0.2f);</code></pre>
 </div>
 <h3 id="led-h">led.h</h3>
 <p class="include"><code>#include "buddhabox/io/led.h"</code> — Driver for the onboard user LED (PC13) on the Black Pill.</p>
-<p>The STM32F401CC Black Pill has a single user-controllable LED wired to pin PC13. The LED is ACTIVE LOW: driving the pin LOW turns it ON, and driving it HIGH turns it OFF. This is a common STM32 board convention — the LED cathode connects to the GPIO pin, and the anode is pulled to 3.3V through a resistor.</p>
+<p>The Black Pill (F411CE or F401CC) has a single user-controllable LED wired to pin PC13. The LED is ACTIVE LOW: driving the pin LOW turns it ON, and driving it HIGH turns it OFF. This is a common STM32 board convention — the LED cathode connects to the GPIO pin, and the anode is pulled to 3.3V through a resistor.</p>
 <p>This class provides:</p>
 <ul><li>Instant on / off / toggle control.</li><li>Non-blocking blink at a configurable interval (driven by update()).</li><li>A clean way to signal firmware status without touching audio code.</li></ul>
 <p>IMPORTANT — DO NOT CALL FROM AUDIO ISR: digitalWrite() and millis() are not safe inside the DMA audio callback. Call update() from loop() only.</p>
@@ -3517,7 +3517,7 @@ led.blink(1000);  // Slow heartbeat: 0.5 Hz</code></pre>
 <p>──────────────────────────────────────────────────────────────────── Without diodes, pressing keys (R0,C0), (R0,C1), and (R1,C0) simultaneously creates a ghost current path:</p>
 <p>C1(HIGH) → Switch(R0,C1) → R0 bus → Switch(R0,C0) → C0 → Switch(R1,C0) → R1(LOW)</p>
 <p>This makes C1 appear LOW when scanning R1, falsely detecting key (R1,C1) as pressed. Each diode (cathode at the row wire, anode at the switch/column side) blocks this reverse current: when R0 is HIGH (not being scanned), the diode at any (R0,*) key is reverse-biased, so no ghost current can flow.</p>
-<p>WIRING (STM32F401CC Black Pill — I2C-safe pin assignment): ──────────────────────────────────────────────────────────────────── Row pins   : PA3, PA4, PA5, PA6, PA7 Column pins: PB0, PB1, PB4, PB5, PB14</p>
+<p>WIRING (Black Pill — I2C-safe pin assignment): ──────────────────────────────────────────────────────────────────── Row pins   : PA3, PA4, PA5, PA6, PA7 Column pins: PB0, PB1, PB4, PB5, PB14</p>
 <p>Row pins   : OUTPUT, driven LOW one at a time during scanning. All other rows held HIGH between scans. Column pins: INPUT_PULLUP (HIGH when open, LOW when pressed). Diode      : cathode to row wire, anode to switch (one per key).</p>
 <p>I2C1 (PB6/PB7 or PB8/PB9), I2C2 (PB10/PB3), and I2C3 (PA8) are deliberately avoided so an I2C peripheral can coexist.</p>
 <h5>Key Numbering</h5>
@@ -3782,6 +3782,113 @@ mux.setSettlingUs(50);  // High-impedance sources (100kΩ+ pots)</code></pre>
 <div class="method-block"><div class="method-sig">void enable()</div><div class="method-desc"><p>Enable the multiplexer (assert EN pin LOW). Only relevant if an EN pin was provided to the constructor.</p></div></div>
 <div class="method-block"><div class="method-sig">void disable()</div><div class="method-desc"><p>Disable the multiplexer (deassert EN pin HIGH).</p>
 <p>When disabled, all 16 channels are disconnected from SIG. Useful for power saving between update sweeps in battery applications. Only relevant if an EN pin was provided to the constructor.</p></div></div>
+</div>
+<h3 id="oled-h">oled.h</h3>
+<p class="include"><code>#include "buddhabox/io/oled.h"</code> — Driver for 128x64 monochrome I2C OLED displays (SSD1306, SH1106).</p>
+<p>The cheap 0.96&quot; (SSD1306) and 1.3&quot; (SH1106) OLED modules are 128 x 64 pixels, one bit per pixel. This driver keeps a copy of the screen in RAM (a &quot;frame buffer&quot;, 1 KB), lets you draw pixels, lines, rectangles and text into it, and sends it to the display when you call display(). It uses only Arduino&#x27;s Wire library: no Adafruit or U8g2 dependency.</p>
+<p>WIRING (I2C, the 4-pin modules): ──────────────────────────────────────────────────────────────────── OLED VCC → 3.3V OLED GND → GND OLED SCL → PB8  (I2C1 SCL, alternate mapping) OLED SDA → PB9  (I2C1 SDA, alternate mapping)</p>
+<p>These are the same pins MPR121Input uses: I2C is a bus, so both devices can share the two wires (they answer to different addresses). The modules already carry pull-up resistors on SDA and SCL.</p>
+<h5>How The Screen Memory Is Laid Out</h5>
+<p>──────────────────────────────────────────────────────────────────── The display&#x27;s memory is not row by row. It is split into 8 horizontal strips called &quot;pages&quot;, each 8 pixels tall. A page holds 128 bytes, one per column, and each byte is a vertical stack of 8 pixels with bit 0 at the top:</p>
+<p>page 0 = rows 0..7,  page 1 = rows 8..15, ... page 7 = rows 56..63 pixel (x, y) is bit (y % 8) of byte buf_[y / 8][x]</p>
+<p>This driver keeps the same layout in RAM so a page can be copied to the display byte for byte.</p>
+<h5>Speed, And Why Only Changed Pages Are Sent</h5>
+<p>──────────────────────────────────────────────────────────────────── I2C at 400 kHz moves about 40 KB/s, so a full 1 KB screen takes about 27 ms, and Wire blocks loop() until it is done. Audio is unaffected: it runs in its own interrupt. To keep loop() responsive, the driver remembers which pages were drawn on since the last display() (a &quot;dirty&quot; flag per page) and sends only those. Updating one line of text costs about 3.5 ms. Redraw 10 to 20 times a second; a knob display needs no more.</p>
+<p>IMPORTANT — DO NOT CALL FROM THE AUDIO ISR: Drawing is cheap but display() talks I2C. Call everything from loop().</p>
+<p class="example-label">Example usage:</p>
+<pre><code>Oled oled;                     // SSD1306 at 0x3C; Oled(true) = SH1106
+
+void setup() {
+  if (!oled.begin())
+    Serial.println(&quot;No OLED found - check wiring&quot;);
+}
+
+void loop() {
+  oled.clear();
+  oled.text(0, 0, &quot;Cutoff&quot;);
+  oled.number(0, 10, 440.0f, 1);   // &quot;440.0&quot;
+  oled.rect(0, 20, 100, 8);        // outline
+  oled.rect(0, 20, 60, 8, true);   // filled: a level bar
+  oled.display();
+  delay(50);  // only in this sketch; real patches use millis()
+}</code></pre>
+<div class="method-block"><div class="method-sig">static const uint8_t OLED_FONT[95][5] =</div><div class="method-desc"><p>The 5 x 7 pixel font for printable ASCII (space to &#x27;~&#x27;), 5 bytes per character. Each byte is one column of the glyph, bit 0 at the top, the same layout as the display&#x27;s pages. Lives in flash (475 bytes).</p></div></div>
+<div class="module-card" id="oled">
+<h4>Oled</h4>
+<div class="method-sig">class Oled</div>
+<p>A 128 x 64 monochrome OLED on I2C, SSD1306 or SH1106 controller.</p>
+<p>Draw into the frame buffer with clear(), pixel(), line(), rect(), text() and number(), then call display() to send the changes. Every drawing call takes an <code>on</code> flag: true lights pixels, false darkens them, so you can draw dark text on a filled bar. Coordinates start at (0, 0) in the top-left corner; anything off-screen is clipped.</p>
+<p>See the file header above for wiring and timing.</p>
+<p class="example-label">Example:</p>
+<pre><code>Oled oled;          // 0.96&quot; SSD1306 module at address 0x3C
+Oled big(true);     // 1.3&quot; SH1106 module
+Oled other(false, 0x3D);  // address jumper moved
+
+oled.begin();
+oled.text(0, 0, &quot;Hello&quot;);
+oled.display();</code></pre>
+<p class="example-label">Instantiation</p><pre><code>Oled nameicit Oled(bool sh1106 = false, uint8_t address = 0x3C);</code></pre>
+<div class="method-block"><div class="method-sig">explicit Oled(bool sh1106 = false, uint8_t address = 0x3C)</div><div class="method-desc"><p>Construct the driver. No I2C traffic until begin().</p>
+<p class="example-label">Example:</p>
+<pre><code>Oled oled;        // SSD1306 at 0x3C</code></pre>
+<div class="method-param">Param <code>sh1106</code> — false for an SSD1306 (most 0.96&quot; modules), true for an SH1106 (most 1.3&quot; modules). The wrong choice shows as a picture shifted 2 pixels with noise at one edge.</div>
+<div class="method-param">Param <code>address</code> — 7-bit I2C address: 0x3C on nearly every module, 0x3D if its address jumper has been moved. (Some modules print the 8-bit form, 0x78 or 0x7A, on the back.)</div></div></div>
+<div class="method-block"><div class="method-sig">bool begin()</div><div class="method-desc"><p>Start I2C on PB8/PB9 at 400 kHz, set the display up and clear it.</p>
+<p class="example-label">Example:</p>
+<pre><code>if (!oled.begin()) Serial.println(&quot;No OLED&quot;);</code></pre>
+<div class="method-returns">Returns: true if the display answered, false if nothing is at the address (check wiring, power and the address). Safe to call with no display attached: it returns false, it doesn&#x27;t hang.</div></div></div>
+<div class="method-block"><div class="method-sig">void clear()</div><div class="method-desc"><p>Blank the frame buffer. Takes effect at the next display().</p>
+<p class="example-label">Example:</p>
+<pre><code>oled.clear();   // start each frame from black</code></pre></div></div>
+<div class="method-block"><div class="method-sig">void pixel(int x, int y, bool on = true)</div><div class="method-desc"><p>Set or clear one pixel. Off-screen coordinates are ignored.</p>
+<p class="example-label">Example:</p>
+<pre><code>oled.pixel(64, 32);   // dot in the middle</code></pre>
+<div class="method-param">Param <code>x</code> — Column, 0 (left) to 127.</div>
+<div class="method-param">Param <code>y</code> — Row, 0 (top) to 63.</div>
+<div class="method-param">Param <code>on</code> — true lights the pixel, false darkens it.</div></div></div>
+<div class="method-block"><div class="method-sig">void line(int x0, int y0, int x1, int y1, bool on = true)</div><div class="method-desc"><p>Draw a straight line between two points, ends included.</p>
+<p class="example-label">Example:</p>
+<pre><code>oled.line(0, 63, 127, 0);   // diagonal, bottom-left to top-right</code></pre>
+<div class="method-param">Param <code>x0,</code> — y0  Start point.</div>
+<div class="method-param">Param <code>x1,</code> — y1  End point. Either end may be off-screen; the visible part is drawn.</div>
+<div class="method-param">Param <code>on</code> — true draws lit pixels, false dark ones.</div></div></div>
+<div class="method-block"><div class="method-sig">void rect(int x, int y, int w, int h, bool fill = false, bool on = true)</div><div class="method-desc"><p>Draw a rectangle, outlined or filled.</p>
+<p class="example-label">Example:</p>
+<pre><code>oled.rect(0, 56, 128, 8);                 // empty bar
+oled.rect(0, 56, (int)(level * 128), 8, true);  // filled part
+oled.rect(0, 0, 128, 8, true, false);     // erase the top line</code></pre>
+<div class="method-param">Param <code>x,</code> — y  Top-left corner.</div>
+<div class="method-param">Param <code>w,</code> — h  Width and height in pixels. Zero or negative draws nothing.</div>
+<div class="method-param">Param <code>fill</code> — false (default) draws a 1-pixel outline; true fills it.</div>
+<div class="method-param">Param <code>on</code> — true draws lit pixels, false dark ones. A filled dark rectangle erases an area.</div></div></div>
+<div class="method-block"><div class="method-sig">int text(int x, int y, const char *s, bool on = true)</div><div class="method-desc"><p>Draw a string in the built-in 5 x 7 font.</p>
+<p>Each character fills a 6 x 8 cell, background included, so new text fully replaces old text drawn at the same place: no need to erase a changing number first. 21 characters fit across, 8 lines down. Characters outside printable ASCII show as &#x27;?&#x27;.</p>
+<p class="example-label">Example:</p>
+<pre><code>int x = oled.text(0, 0, &quot;Freq &quot;);
+oled.number(x, 0, hz, 1);      // &quot;Freq 440.0&quot;
+oled.text(0, 8, &quot;MENU&quot;, false); // inverted</code></pre>
+<div class="method-param">Param <code>x,</code> — y  Top-left of the first character. Any y works; y = 0, 8, 16 ... line up with the display&#x27;s pages and are the cheapest to send.</div>
+<div class="method-param">Param <code>s</code> — The text (a null-terminated C string).</div>
+<div class="method-param">Param <code>on</code> — true for lit text on black, false for black text on a lit cell (a highlight).</div>
+<div class="method-returns">Returns: The x just after the last character, to continue on the same line.</div></div></div>
+<div class="method-block"><div class="method-sig">int number(int x, int y, float value, int decimals = 2, bool on = true)</div><div class="method-desc"><p>Draw a number with a fixed count of decimal places.</p>
+<p>Formats without printf: on this toolchain printf&#x27;s %f support is left out to save flash, so snprintf(&quot;%f&quot;) prints nothing.</p>
+<p class="example-label">Example:</p>
+<pre><code>oled.number(0, 0, 3.14159f, 2);   // &quot;3.14&quot;
+oled.number(0, 8, -12.0f, 0);     // &quot;-12&quot;</code></pre>
+<div class="method-param">Param <code>x,</code> — y      Top-left, as text().</div>
+<div class="method-param">Param <code>value</code> — The number. Beyond about ±2 billion / 10^decimals it is clipped.</div>
+<div class="method-param">Param <code>decimals</code> — Digits after the point, 0 to 4.</div>
+<div class="method-param">Param <code>on</code> — As text().</div>
+<div class="method-returns">Returns: The x just after the last character.</div></div></div>
+<div class="method-block"><div class="method-sig">void display()</div><div class="method-desc"><p>Send every page drawn on since the last display() to the screen.</p>
+<p>Blocks while I2C runs: about 3.4 ms per changed page, 27 ms for a full screen. Call it from loop() only, at 10 to 20 frames a second.</p>
+<p class="example-label">Example:</p>
+<pre><code>if (millis() - last &gt;= 50) {   // 20 frames a second
+  last = millis();
+  drawScreen();
+  oled.display();
+}</code></pre></div></div>
 </div>
 <h3 id="switch-input-h">switch_input.h</h3>
 <p class="include"><code>#include "buddhabox/io/switch_input.h"</code> — Debounced digital switch input with trigger/hold/release detection.</p>

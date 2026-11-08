@@ -284,9 +284,9 @@ const MODULES = window.MODULES || {};
 const STORE_KEY = 'buddhabox-editor-patch';
 
 // Mirrors of the constants in tools/gen_patch.py, for the estimate.
-const BUDGET = 1905;            // CPU cycles per sample at 84 MHz, 44.1 kHz
+const BUDGET = 2177;            // CPU cycles per sample at 96 MHz, 44.1 kHz
 const BASE_RAM = 6104;          // the framework's own RAM
-const RAM_SIZE = 65536;
+const RAM_SIZE = 131072;       // F411; the F401 has 65536
 const UNMEASURED_SETTER = 200;  // assumed cost of an unprofiled setter
 const SAFE = 0.8;
 

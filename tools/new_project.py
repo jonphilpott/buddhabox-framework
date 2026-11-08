@@ -40,7 +40,7 @@ PLATFORMIO_INI = """\
 
 [env:{name}]
 platform = ststm32@15.4.1
-board = blackpill_f401cc
+board = blackpill_f411ce   ; or blackpill_f401cc
 framework = arduino
 upload_protocol = dfu
 ; The STM32 core adds -Os after build_flags and GCC obeys the last -O,

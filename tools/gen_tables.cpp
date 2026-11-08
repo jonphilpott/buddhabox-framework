@@ -6,8 +6,8 @@
  * Many DSP modules read curves from lookup tables (a sine cycle, decay-time
  * curves, wavefolder transfer curves). On a desktop you can compute those
  * at start-up, but on the Black Pill that would cost precious RAM: a table
- * filled at run time lives in RAM (64 KB total), while a `const` table
- * written into the source lives in flash (256 KB, mostly free).
+ * filled at run time lives in RAM (128 KB total), while a `const` table
+ * written into the source lives in flash (512 KB, mostly free).
  *
  * So, like Emilie Gillet's own Python scripts for the Mutable Instruments
  * firmware, we compute the tables once on the computer and write them out

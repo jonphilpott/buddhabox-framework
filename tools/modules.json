@@ -98,7 +98,7 @@
    }
   },
   "events": [],
-  "cycles": 40.5,
+  "cycles": 41.7,
   "scaling": null,
   "ram": 28,
   "ram_size": null
@@ -222,7 +222,7 @@
    }
   },
   "events": [],
-  "cycles": 49.3,
+  "cycles": 50.0,
   "scaling": null,
   "ram": 272,
   "ram_size": null
@@ -346,7 +346,7 @@
    }
   },
   "events": [],
-  "cycles": 30.6,
+  "cycles": 31.2,
   "scaling": null,
   "ram": 20,
   "ram_size": null
@@ -574,7 +574,7 @@
    }
   },
   "events": [],
-  "cycles": 97.0,
+  "cycles": 96.0,
   "scaling": null,
   "ram": 32,
   "ram_size": null
@@ -1383,7 +1383,7 @@
    }
   },
   "events": [],
-  "cycles": 0.2,
+  "cycles": 0.0,
   "scaling": null,
   "ram": 20,
   "ram_size": null
@@ -1539,7 +1539,7 @@
   ],
   "params": {},
   "events": [],
-  "cycles": 58.5,
+  "cycles": 58.8,
   "scaling": null,
   "ram": 16,
   "ram_size": null
@@ -1662,7 +1662,7 @@
    }
   },
   "events": [],
-  "cycles": 37.0,
+  "cycles": 36.0,
   "scaling": null,
   "ram": 84,
   "ram_size": null
@@ -1694,7 +1694,7 @@
   ],
   "params": {},
   "events": [],
-  "cycles": 0.0,
+  "cycles": 1.0,
   "scaling": null,
   "ram": 4,
   "ram_size": null
@@ -1936,7 +1936,7 @@
    }
   },
   "events": [],
-  "cycles": 75.0,
+  "cycles": 76.1,
   "scaling": null,
   "ram": 108,
   "ram_size": null
@@ -2082,7 +2082,7 @@
    }
   },
   "events": [],
-  "cycles": 215.0,
+  "cycles": 216.1,
   "scaling": null,
   "ram": 60,
   "ram_size": null
@@ -2124,9 +2124,9 @@
   ],
   "params": {},
   "events": [],
-  "cycles": null,
+  "cycles": 4.0,
   "scaling": null,
-  "ram": null,
+  "ram": 1,
   "ram_size": null
  },
  "Multiply": {
@@ -2156,9 +2156,9 @@
   ],
   "params": {},
   "events": [],
-  "cycles": null,
+  "cycles": 0.0,
   "scaling": null,
-  "ram": null,
+  "ram": 1,
   "ram_size": null
  },
  "Param": {
@@ -2188,9 +2188,9 @@
    }
   },
   "events": [],
-  "cycles": null,
+  "cycles": 0.0,
   "scaling": null,
-  "ram": null,
+  "ram": 8,
   "ram_size": null
  },
  "Range": {
@@ -2256,9 +2256,9 @@
    }
   },
   "events": [],
-  "cycles": null,
+  "cycles": 77.0,
   "scaling": null,
-  "ram": null,
+  "ram": 24,
   "ram_size": null
  },
  "Compressor": {
@@ -2517,7 +2517,7 @@
    }
   },
   "events": [],
-  "cycles": 131.1,
+  "cycles": 130.1,
   "scaling": null,
   "ram": 76,
   "ram_size": null
@@ -2577,7 +2577,7 @@
   "events": [
    "trigger"
   ],
-  "cycles": 90.0,
+  "cycles": 92.1,
   "scaling": null,
   "ram": 72,
   "ram_size": null
@@ -2634,7 +2634,7 @@
    }
   },
   "events": [],
-  "cycles": 258.5,
+  "cycles": 257.4,
   "scaling": null,
   "ram": 4188,
   "ram_size": 2048
@@ -2729,7 +2729,7 @@
    }
   },
   "events": [],
-  "cycles": 354.3,
+  "cycles": 366.3,
   "scaling": null,
   "ram": 4224,
   "ram_size": 2048
@@ -2786,7 +2786,7 @@
    }
   },
   "events": [],
-  "cycles": 389.8,
+  "cycles": 399.4,
   "scaling": null,
   "ram": 8292,
   "ram_size": 4096
@@ -3039,7 +3039,7 @@
    }
   },
   "events": [],
-  "cycles": 74.2,
+  "cycles": 76.7,
   "scaling": null,
   "ram": 8,
   "ram_size": null
@@ -3109,7 +3109,7 @@
    }
   },
   "events": [],
-  "cycles": 15.0,
+  "cycles": 13.8,
   "scaling": null,
   "ram": 1048,
   "ram_size": 512
@@ -3239,7 +3239,7 @@
    }
   },
   "events": [],
-  "cycles": 1294.4,
+  "cycles": 1294.2,
   "scaling": {
    "setter": "setModes",
    "default": 24,
@@ -3300,7 +3300,7 @@
   "events": [
    "trigger"
   ],
-  "cycles": 76.0,
+  "cycles": 75.9,
   "scaling": null,
   "ram": 1092,
   "ram_size": null
@@ -3382,7 +3382,7 @@
    }
   },
   "events": [],
-  "cycles": 420.1,
+  "cycles": 427.4,
   "scaling": null,
   "ram": 3268,
   "ram_size": 512
@@ -3445,7 +3445,7 @@
    }
   },
   "events": [],
-  "cycles": 63.5,
+  "cycles": 64.2,
   "scaling": null,
   "ram": 2100,
   "ram_size": 512
@@ -3687,7 +3687,7 @@
   "events": [
    "trigger"
   ],
-  "cycles": 130.1,
+  "cycles": 132.1,
   "scaling": null,
   "ram": 80,
   "ram_size": null
@@ -3875,7 +3875,7 @@
   "events": [
    "trigger"
   ],
-  "cycles": 248.9,
+  "cycles": 249.1,
   "scaling": null,
   "ram": 188,
   "ram_size": null
@@ -4056,7 +4056,7 @@
    }
   },
   "events": [],
-  "cycles": 409.3,
+  "cycles": 410.0,
   "scaling": null,
   "ram": 148,
   "ram_size": null

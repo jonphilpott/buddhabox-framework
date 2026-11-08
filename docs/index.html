@@ -10,7 +10,7 @@
 
 <header>
   <h1>Buddha<span>Box</span></h1>
-  <p>A header-only audio DSP framework for the STM32F401 Black Pill and an
+  <p>A header-only audio DSP framework for the STM32F411 Black Pill and an
      I2S DAC: 79 classes, from simple oscillators to Mutable Instruments'
      resonators, reverbs and drums.</p>
 </header>
@@ -40,12 +40,13 @@
 separates its reusable parts from that patch and adds ports of the
 components in <a href="https://github.com/pichenettes/eurorack">Mutable
 Instruments' firmware</a> (via the Partials library) that fit the Black
-Pill's 84 MHz Cortex-M4 and 64 KB of RAM.</p>
+Pill's 96 MHz Cortex-M4 and 128 KB of RAM. The older F401 Black Pill
+(84 MHz, 64 KB) works too, with less headroom.</p>
 
 <div class="stats">
   <div class="stat-box"><div class="value">79</div><div class="label">Classes</div></div>
-  <div class="stat-box"><div class="value">~1900</div><div class="label">CPU cycles per sample</div></div>
-  <div class="stat-box"><div class="value">58 KB</div><div class="label">RAM free for DSP</div></div>
+  <div class="stat-box"><div class="value">~2177</div><div class="label">CPU cycles per sample</div></div>
+  <div class="stat-box"><div class="value">122 KB</div><div class="label">RAM free for DSP</div></div>
   <div class="stat-box"><div class="value">0</div><div class="label">Heap allocations</div></div>
 </div>
 
@@ -65,7 +66,7 @@ Pill's 84 MHz Cortex-M4 and 64 KB of RAM.</p>
     PlatformIO's RAM report tells you the true cost at build time.</li>
   <li><strong>Tables in flash.</strong> Lookup tables (sine, curves,
     wavefolders) are <code>static const</code> arrays generated ahead of
-    time, so they cost flash (256 KB, mostly free) instead of RAM.</li>
+    time, so they cost flash (512 KB, mostly free) instead of RAM.</li>
   <li><strong>16-bit delay storage.</strong> Delay lines store
     <code>int16_t</code> where the signal allows, halving their RAM.</li>
 </ul>
@@ -87,7 +88,7 @@ path uses your local checkout directly, so edits to the framework show up
 immediately:</p>
 <pre><code>[env:myproject]
 platform = ststm32@15.4.1
-board = blackpill_f401cc
+board = blackpill_f411ce   ; or blackpill_f401cc
 framework = arduino
 upload_protocol = dfu
 build_unflags = -Os
@@ -195,7 +196,9 @@ go. To turn the LED off, for example to use PC13 yourself or with
 
 <h3>Components</h3>
 <ul>
-  <li><strong>WeAct Studio Black Pill V2.0</strong> (STM32F401CCU6)</li>
+  <li><strong>WeAct Studio Black Pill V2.0</strong> (STM32F411CEU6). The F401CCU6
+    version has the same pinout and also works; build for it with
+    <code>board = blackpill_f401cc</code>.</li>
   <li><strong>UDA1334A I2S DAC</strong> breakout, or a <strong>MAX98357A</strong>
     I2S amplifier to drive a speaker directly</li>
   <li>Optional: pots, switches, an MPR121 touch board, a CD74HC4067
@@ -223,10 +226,84 @@ go. To turn the LED off, for example to use PC13 yourself or with
   <tr><td>(open)</td><td>SD</td><td>Mode</td><td>Floating = (left + right) / 2 mono</td></tr>
 </table>
 
-<div class="note"><strong>Fixed pins.</strong> PB12, PB13 and PB15 are the
-STM32F401's SPI2/I2S2 alternate function (AF5). Other pins would need a
-different I2S peripheral and changes to
+<div class="note"><strong>Fixed pins.</strong> PB12, PB13 and PB15 are
+the SPI2/I2S2 alternate function (AF5) on both the F401 and F411. Other
+pins would need a different I2S peripheral and changes to
 <code>engine/audio_engine.cpp</code>.</div>
+
+<h3>Pins for knobs, switches and LEDs</h3>
+<p>After audio, USB and the debug port have taken their pins, the Black
+Pill has <strong>23 free pins</strong>. <strong>10 of them can read a
+knob</strong>; all 23 can read a switch or drive an LED. The F401 and
+F411 boards share this pinout.</p>
+
+<table>
+  <tr><th>Pins</th><th>Count</th><th>Knob (analog)</th><th>Switch / LED (digital)</th><th>Notes</th></tr>
+  <tr><td>PA0&ndash;PA7</td><td>8</td><td>Yes</td><td>Yes</td><td>PA0 is also the board's KEY button, which grounds it while pressed</td></tr>
+  <tr><td>PB0, PB1</td><td>2</td><td>Yes</td><td>Yes</td><td></td></tr>
+  <tr><td>PA8, PA15</td><td>2</td><td>No</td><td>Yes</td><td></td></tr>
+  <tr><td>PA9, PA10</td><td>2</td><td>No</td><td>Yes</td><td>Serial port 1 (TX, RX) if you need one</td></tr>
+  <tr><td>PB3, PB4, PB5</td><td>3</td><td>No</td><td>Yes</td><td></td></tr>
+  <tr><td>PB6, PB7</td><td>2</td><td>No</td><td>Yes</td><td>I2C1 (SCL, SDA), the default mapping</td></tr>
+  <tr><td>PB8, PB9</td><td>2</td><td>No</td><td>Yes</td><td>I2C1 (SCL, SDA), the mapping the MPR121 driver uses</td></tr>
+  <tr><td>PB10, PB14</td><td>2</td><td>No</td><td>Yes</td><td></td></tr>
+</table>
+
+<p><strong>Taken, so avoid:</strong> PB12, PB13, PB15 (I2S audio); PA11,
+PA12 (USB); PA13, PA14 (the SW debug header, for an ST-Link); PC14, PC15
+(32 kHz crystal); PB2 (BOOT1, tied to ground on the board); PC13 (the
+on-board blue LED, which the engine lights on an overrun unless you build
+with <code>-D BB_OVERRUN_LED=0</code>).</p>
+
+<h4>Wiring a knob</h4>
+<p>Use a 10k linear potentiometer: one outer leg to 3V3, the other to
+GND, the middle leg (wiper) to an analog pin. Read it with
+<code>AnalogInput</code>, which gives 0.0 to 1.0 and smooths out ADC
+noise. The ADC is 12-bit (0&ndash;4095) and reads 0&ndash;3.3 V.</p>
+
+<h4>Wiring a switch</h4>
+<p>Wire a push button or toggle between any free pin and GND.
+<code>SwitchInput</code> turns on the chip's internal pull-up resistor
+and removes contact bounce, so no other parts are needed.</p>
+
+<div class="note"><strong>3.3 V only.</strong> Never connect a pot or
+sensor powered from 5 V to an analog pin: the pins read 0&ndash;3.3 V, and
+5 V on them in analog mode can damage the chip.</div>
+
+<h4>More controls than pins</h4>
+<ul>
+  <li><strong>More knobs:</strong> a CD74HC4067 multiplexer reads 16 knobs
+    through one analog pin plus 4 digital select pins
+    (<code>MuxInput</code>). Two multiplexers sharing the select pins give
+    32 knobs for 6 pins.</li>
+  <li><strong>More buttons:</strong> a diode-matrix keypad reads rows
+    &times; columns keys, so 5 + 5 pins give 25 keys
+    (<code>MatrixKeypad</code>).</li>
+  <li><strong>Touch pads:</strong> an MPR121 board adds 12 touch inputs on
+    the two I2C pins (<code>MPR121Input</code>).</li>
+</ul>
+
+<h3>Wiring: Black Pill to an OLED display</h3>
+<p>The cheap 128&times;64 monochrome OLED modules work with
+<code>Oled</code> (<code>io/oled.h</code>), which needs no other library.
+Buy the 4-pin I2C version: the 0.96" modules use an SSD1306 chip, the
+1.3" ones usually an SH1106 (construct it as <code>Oled oled(true);</code>).</p>
+<table class="wiring-table">
+  <tr><th>Black Pill</th><th>OLED</th><th>Signal</th><th>Notes</th></tr>
+  <tr><td>3V3</td><td>VCC</td><td>Power</td><td></td></tr>
+  <tr><td>GND</td><td>GND</td><td>Ground</td><td></td></tr>
+  <tr><td>PB8</td><td>SCL</td><td>I2C clock</td><td>Shared with an MPR121, if fitted</td></tr>
+  <tr><td>PB9</td><td>SDA</td><td>I2C data</td><td>Shared with an MPR121, if fitted</td></tr>
+</table>
+<p>Draw into a 1 KB copy of the screen with <code>pixel()</code>,
+<code>line()</code>, <code>rect()</code> (outlined or filled),
+<code>text()</code> and <code>number()</code>, then call
+<code>display()</code>. Text uses a 5&times;7 font: 21 characters by 8
+lines. I2C is slow, about 27 ms for a whole screen, so
+<code>display()</code> sends only the 8-pixel strips that changed. Redraw
+from <code>loop()</code> 10 to 20 times a second, never from the audio
+callback. Audio is unaffected while it sends; <code>loop()</code>
+waits.</p>
 
 <h3>Signal path</h3>
 <div class="flow">
@@ -294,9 +371,9 @@ Instruments one. They are deliberately different, not duplicates:</p>
 <section id="budget">
 <h2>Memory and CPU budgets</h2>
 
-<p>The Black Pill gives you about <strong>1,900 CPU cycles per
-sample</strong> (84 MHz &divide; 44.1 kHz) and <strong>64 KB of RAM</strong>,
-of which the Arduino core, USB serial and the DMA buffer take about 6 KB.
+<p>The F411 Black Pill gives you about <strong>2,177 CPU cycles per
+sample</strong> (96 MHz &divide; 44.1 kHz) and <strong>128 KB of RAM</strong>
+(the F401: 1,905 cycles and 64 KB), of which the Arduino core, USB serial and the DMA buffer take about 6 KB.
 RAM figures below are <code>sizeof()</code> of each object, measured.
 CPU figures are measured on the board (below); measure your own patch
 with <code>AudioEngine::cpuLoad()</code>.</p>
@@ -320,107 +397,116 @@ with <code>AudioEngine::cpuLoad()</code>.</p>
 <p>Everything else uses under 0.5 KB.</p>
 
 <h3>Measured CPU cost</h3>
-<p>Measured on a Black Pill at 84 MHz with the <code>profile_all</code>
+<p>Measured on an F411 Black Pill at 96 MHz with the <code>profile_all</code>
 example (GCC 9, <code>-O2</code>), fastest of five runs of 4,096 samples,
-loop overhead removed. Inputs are full-scale white noise; drums, plucks and
-envelopes are kept sounding. The budget is 1,905 cycles per sample; keep a
-patch below about 80%, roughly 1,500 cycles, to leave room for USB and
+loop overhead removed. Inputs are full-scale white noise; drums, plucks
+and envelopes are kept sounding. Shares are of the F411's 2,177 cycles
+per sample. Cycle counts are within 3% of the 84 MHz F401's, so on an
+F401 divide them by its 1,905 instead. Keep a patch below about 80%
+(roughly 1,740 cycles on the F411, 1,500 on the F401) to leave room for
+USB and
 <code>loop()</code>. RAM is <code>sizeof()</code> at the template size
 shown; a smaller buffer saves RAM, not cycles.</p>
 <table>
   <tr><th>Module</th><th>Cycles per sample</th><th>Share of the CPU</th><th>RAM</th></tr>
   <tr><th colspan="4">Oscillators</th></tr>
-  <tr><td><code>Oscillator</code></td><td>31</td><td>1.6%</td><td>20 B</td></tr>
-  <tr><td><code>LFO</code></td><td>45</td><td>2.4%</td><td>24 B</td></tr>
-  <tr><td><code>SineOscillator</code></td><td>19</td><td>1.0%</td><td>12 B</td></tr>
-  <tr><td><code>SineOscillator</code> (sine and cosine)</td><td>39</td><td>2.0%</td><td>12 B</td></tr>
-  <tr><td><code>BasicOscillator</code></td><td>43</td><td>2.3%</td><td>36 B</td></tr>
-  <tr><td><code>VariableShapeOscillator</code></td><td>106</td><td>5.6%</td><td>40 B</td></tr>
-  <tr><td><code>FormantOscillator</code></td><td>40</td><td>2.1%</td><td>28 B</td></tr>
-  <tr><td><code>VosimOscillator</code></td><td>97</td><td>5.1%</td><td>32 B</td></tr>
-  <tr><td><code>GrainletOscillator</code></td><td>99</td><td>5.2%</td><td>32 B</td></tr>
-  <tr><td><code>ZOscillator</code></td><td>124</td><td>6.5%</td><td>36 B</td></tr>
-  <tr><td><code>HarmonicOscillator</code></td><td>49</td><td>2.6%</td><td>272 B</td></tr>
-  <tr><td><code>StringSynthOscillator</code></td><td>44</td><td>2.3%</td><td>76 B</td></tr>
+  <tr><td><code>Oscillator</code></td><td>31</td><td>1.4%</td><td>20 B</td></tr>
+  <tr><td><code>LFO</code></td><td>45</td><td>2.1%</td><td>24 B</td></tr>
+  <tr><td><code>SineOscillator</code></td><td>19</td><td>0.9%</td><td>12 B</td></tr>
+  <tr><td><code>SineOscillator</code> (sine and cosine)</td><td>39</td><td>1.8%</td><td>12 B</td></tr>
+  <tr><td><code>BasicOscillator</code></td><td>43</td><td>2.0%</td><td>36 B</td></tr>
+  <tr><td><code>VariableShapeOscillator</code></td><td>106</td><td>4.9%</td><td>40 B</td></tr>
+  <tr><td><code>FormantOscillator</code></td><td>42</td><td>1.9%</td><td>28 B</td></tr>
+  <tr><td><code>VosimOscillator</code></td><td>96</td><td>4.4%</td><td>32 B</td></tr>
+  <tr><td><code>GrainletOscillator</code></td><td>99</td><td>4.5%</td><td>32 B</td></tr>
+  <tr><td><code>ZOscillator</code></td><td>124</td><td>5.7%</td><td>36 B</td></tr>
+  <tr><td><code>HarmonicOscillator</code></td><td>50</td><td>2.3%</td><td>272 B</td></tr>
+  <tr><td><code>StringSynthOscillator</code></td><td>44</td><td>2.0%</td><td>76 B</td></tr>
   <tr><th colspan="4">Noise and random</th></tr>
   <tr><td><code>WhiteNoise</code></td><td>under 5</td><td>under 0.3%</td><td>4 B</td></tr>
-  <tr><td><code>PinkNoise</code></td><td>58</td><td>3.0%</td><td>60 B</td></tr>
-  <tr><td><code>LFSR</code></td><td>5</td><td>0.3%</td><td>4 B</td></tr>
+  <tr><td><code>PinkNoise</code></td><td>58</td><td>2.7%</td><td>60 B</td></tr>
+  <tr><td><code>LFSR</code></td><td>5</td><td>0.2%</td><td>4 B</td></tr>
   <tr><td><code>Dust</code></td><td>6</td><td>0.3%</td><td>20 B</td></tr>
-  <tr><td><code>Particle</code></td><td>51</td><td>2.7%</td><td>64 B</td></tr>
-  <tr><td><code>ClockedNoise</code></td><td>21</td><td>1.1%</td><td>24 B</td></tr>
+  <tr><td><code>Particle</code></td><td>51</td><td>2.4%</td><td>64 B</td></tr>
+  <tr><td><code>ClockedNoise</code></td><td>21</td><td>1.0%</td><td>24 B</td></tr>
   <tr><td><code>SmoothRandom</code></td><td>12</td><td>0.6%</td><td>24 B</td></tr>
   <tr><th colspan="4">Filters</th></tr>
   <tr><td><code>SVFilter</code></td><td>6</td><td>0.3%</td><td>28 B</td></tr>
-  <tr><td><code>Svf</code></td><td>18</td><td>0.9%</td><td>28 B</td></tr>
-  <tr><td><code>MoogFilter</code></td><td>44</td><td>2.3%</td><td>28 B</td></tr>
-  <tr><td><code>OnePole</code></td><td>13</td><td>0.7%</td><td>16 B</td></tr>
-  <tr><td><code>DcBlocker</code></td><td>5</td><td>0.3%</td><td>12 B</td></tr>
-  <tr><td><code>VowelFilter</code></td><td>199</td><td>10.4%</td><td>176 B</td></tr>
-  <tr><td><code>Hilbert</code></td><td>258</td><td>13.6%</td><td>212 B</td></tr>
-  <tr><td><code>AllpassFilter&lt;512&gt;</code></td><td>67</td><td>3.5%</td><td>1.0 KB</td></tr>
+  <tr><td><code>Svf</code></td><td>18</td><td>0.8%</td><td>28 B</td></tr>
+  <tr><td><code>MoogFilter</code></td><td>44</td><td>2.0%</td><td>28 B</td></tr>
+  <tr><td><code>OnePole</code></td><td>13</td><td>0.6%</td><td>16 B</td></tr>
+  <tr><td><code>DcBlocker</code></td><td>5</td><td>0.2%</td><td>12 B</td></tr>
+  <tr><td><code>VowelFilter</code></td><td>199</td><td>9.1%</td><td>176 B</td></tr>
+  <tr><td><code>Hilbert</code></td><td>258</td><td>11.8%</td><td>212 B</td></tr>
+  <tr><td><code>AllpassFilter&lt;512&gt;</code></td><td>67</td><td>3.1%</td><td>1.0 KB</td></tr>
   <tr><th colspan="4">Modulation</th></tr>
-  <tr><td><code>Envelope</code></td><td>9</td><td>0.5%</td><td>20 B</td></tr>
-  <tr><td><code>SegmentEnvelope</code></td><td>75</td><td>3.9%</td><td>108 B</td></tr>
-  <tr><td><code>Slope</code></td><td>215</td><td>11.3%</td><td>60 B</td></tr>
+  <tr><td><code>Envelope</code></td><td>9</td><td>0.4%</td><td>20 B</td></tr>
+  <tr><td><code>SegmentEnvelope</code></td><td>76</td><td>3.5%</td><td>108 B</td></tr>
+  <tr><td><code>Slope</code></td><td>216</td><td>9.9%</td><td>60 B</td></tr>
   <tr><td><code>SlewLimiter</code></td><td>12</td><td>0.6%</td><td>12 B</td></tr>
-  <tr><td><code>Lag</code></td><td>58</td><td>3.1%</td><td>16 B</td></tr>
+  <tr><td><code>Lag</code></td><td>59</td><td>2.7%</td><td>16 B</td></tr>
   <tr><td><code>SampleAndHold</code></td><td>under 5</td><td>under 0.3%</td><td>4 B</td></tr>
   <tr><td><code>TempoClock</code></td><td>under 5</td><td>under 0.3%</td><td>20 B</td></tr>
-  <tr><td><code>ClockToRamp</code></td><td>22</td><td>1.2%</td><td>320 B</td></tr>
-  <tr><td><code>Lorenz</code></td><td>16</td><td>0.8%</td><td>24 B</td></tr>
-  <tr><td><code>BouncingBall</code></td><td>15</td><td>0.8%</td><td>36 B</td></tr>
-  <tr><td><code>RandomSequence</code></td><td>37</td><td>1.9%</td><td>84 B</td></tr>
-  <tr><td><code>Quantizer</code></td><td>186</td><td>9.8%</td><td>204 B</td></tr>
-  <tr><td><code>HysteresisQuantizer</code></td><td>22</td><td>1.2%</td><td>20 B</td></tr>
+  <tr><td><code>ClockToRamp</code></td><td>22</td><td>1.0%</td><td>320 B</td></tr>
+  <tr><td><code>Lorenz</code></td><td>16</td><td>0.7%</td><td>24 B</td></tr>
+  <tr><td><code>BouncingBall</code></td><td>15</td><td>0.7%</td><td>36 B</td></tr>
+  <tr><td><code>RandomSequence</code></td><td>36</td><td>1.6%</td><td>84 B</td></tr>
+  <tr><td><code>Quantizer</code></td><td>186</td><td>8.6%</td><td>204 B</td></tr>
+  <tr><td><code>HysteresisQuantizer</code></td><td>22</td><td>1.0%</td><td>20 B</td></tr>
+  <tr><th colspan="4">Utility</th></tr>
+  <tr><td><code>Range</code> (linear)</td><td>21</td><td>1.0%</td><td>24 B</td></tr>
+  <tr><td><code>Range</code> (exponential)</td><td>77</td><td>3.5%</td><td>24 B</td></tr>
+  <tr><td><code>Mixer</code></td><td>under 5</td><td>under 0.3%</td><td>1 B</td></tr>
+  <tr><td><code>Multiply</code></td><td>under 5</td><td>under 0.3%</td><td>1 B</td></tr>
+  <tr><td><code>Param</code></td><td>under 5</td><td>under 0.3%</td><td>8 B</td></tr>
   <tr><th colspan="4">Dynamics</th></tr>
-  <tr><td><code>LowPassGate</code></td><td>47</td><td>2.5%</td><td>20 B</td></tr>
-  <tr><td><code>Vactrol</code></td><td>131</td><td>6.9%</td><td>76 B</td></tr>
-  <tr><td><code>VactrolLpg</code></td><td>90</td><td>4.7%</td><td>72 B</td></tr>
-  <tr><td><code>Follower</code></td><td>142</td><td>7.5%</td><td>92 B</td></tr>
-  <tr><td><code>Compressor</code></td><td>158</td><td>8.3%</td><td>44 B</td></tr>
+  <tr><td><code>LowPassGate</code></td><td>47</td><td>2.2%</td><td>20 B</td></tr>
+  <tr><td><code>Vactrol</code></td><td>130</td><td>6.0%</td><td>76 B</td></tr>
+  <tr><td><code>VactrolLpg</code></td><td>92</td><td>4.2%</td><td>72 B</td></tr>
+  <tr><td><code>Follower</code></td><td>142</td><td>6.5%</td><td>92 B</td></tr>
+  <tr><td><code>Compressor</code></td><td>158</td><td>7.3%</td><td>44 B</td></tr>
   <tr><th colspan="4">Effects</th></tr>
-  <tr><td><code>DelayLine&lt;1024&gt;</code> (write and read)</td><td>51</td><td>2.7%</td><td>2.0 KB</td></tr>
-  <tr><td><code>Reverb&lt;4096&gt;</code> (stereo)</td><td>510</td><td>26.8%</td><td>8.2 KB</td></tr>
-  <tr><td><code>Chorus&lt;2048&gt;</code> (stereo)</td><td>258</td><td>13.6%</td><td>4.1 KB</td></tr>
-  <tr><td><code>Ensemble&lt;4096&gt;</code> (stereo)</td><td>390</td><td>20.5%</td><td>8.1 KB</td></tr>
-  <tr><td><code>Diffuser&lt;2048&gt;</code> (stereo)</td><td>354</td><td>18.6%</td><td>4.1 KB</td></tr>
-  <tr><td><code>PitchShifter&lt;2048&gt;</code></td><td>132</td><td>7.0%</td><td>4.1 KB</td></tr>
-  <tr><td><code>Decimator</code></td><td>22</td><td>1.2%</td><td>28 B</td></tr>
-  <tr><td><code>Limiter</code> (stereo)</td><td>103</td><td>5.4%</td><td>16 B</td></tr>
-  <tr><td><code>Limiter</code> (stereo idle)</td><td>38</td><td>2.0%</td><td>16 B</td></tr>
-  <tr><td><code>Overdrive</code></td><td>114</td><td>6.0%</td><td>12 B</td></tr>
+  <tr><td><code>DelayLine&lt;1024&gt;</code> (write and read)</td><td>51</td><td>2.3%</td><td>2.0 KB</td></tr>
+  <tr><td><code>Reverb&lt;4096&gt;</code> (stereo)</td><td>510</td><td>23.4%</td><td>8.2 KB</td></tr>
+  <tr><td><code>Chorus&lt;2048&gt;</code> (stereo)</td><td>257</td><td>11.8%</td><td>4.1 KB</td></tr>
+  <tr><td><code>Ensemble&lt;4096&gt;</code> (stereo)</td><td>399</td><td>18.4%</td><td>8.1 KB</td></tr>
+  <tr><td><code>Diffuser&lt;2048&gt;</code> (stereo)</td><td>366</td><td>16.8%</td><td>4.1 KB</td></tr>
+  <tr><td><code>PitchShifter&lt;2048&gt;</code></td><td>132</td><td>6.1%</td><td>4.1 KB</td></tr>
+  <tr><td><code>Decimator</code></td><td>22</td><td>1.0%</td><td>28 B</td></tr>
+  <tr><td><code>Limiter</code> (stereo)</td><td>103</td><td>4.7%</td><td>16 B</td></tr>
+  <tr><td><code>Limiter</code> (stereo idle)</td><td>38</td><td>1.8%</td><td>16 B</td></tr>
+  <tr><td><code>Overdrive</code></td><td>114</td><td>5.2%</td><td>12 B</td></tr>
   <tr><td><code>WaveFolder</code></td><td>8</td><td>0.4%</td><td>4 B</td></tr>
-  <tr><td><code>TableWavefolder</code></td><td>74</td><td>3.9%</td><td>8 B</td></tr>
+  <tr><td><code>TableWavefolder</code></td><td>77</td><td>3.5%</td><td>8 B</td></tr>
   <tr><th colspan="4">Physical models</th></tr>
-  <tr><td><code>KarplusStrong&lt;512&gt;</code></td><td>15</td><td>0.8%</td><td>1.0 KB</td></tr>
-  <tr><td><code>ModalResonator</code> (12 modes)</td><td>704</td><td>37.0%</td><td>2.1 KB</td></tr>
-  <tr><td><code>ModalResonator</code> (24 modes)</td><td>1,294</td><td>67.9%</td><td>2.1 KB</td></tr>
-  <tr><td><code>ModalResonator&lt;64&gt;</code> (12 modes bowed)</td><td>1,294</td><td>68.0%</td><td>4.1 KB</td></tr>
-  <tr><td><code>StringModel&lt;512&gt;</code></td><td>420</td><td>22.1%</td><td>3.2 KB</td></tr>
-  <tr><td><code>Plucker</code></td><td>76</td><td>4.0%</td><td>1.1 KB</td></tr>
-  <tr><td><code>Tube&lt;512&gt;</code></td><td>64</td><td>3.3%</td><td>2.1 KB</td></tr>
+  <tr><td><code>KarplusStrong&lt;512&gt;</code></td><td>14</td><td>0.6%</td><td>1.0 KB</td></tr>
+  <tr><td><code>ModalResonator</code> (12 modes)</td><td>704</td><td>32.3%</td><td>2.1 KB</td></tr>
+  <tr><td><code>ModalResonator</code> (24 modes)</td><td>1293</td><td>59.4%</td><td>2.1 KB</td></tr>
+  <tr><td><code>ModalResonator&lt;64&gt;</code> (12 modes bowed)</td><td>1294</td><td>59.5%</td><td>4.1 KB</td></tr>
+  <tr><td><code>StringModel&lt;512&gt;</code></td><td>427</td><td>19.6%</td><td>3.2 KB</td></tr>
+  <tr><td><code>Plucker</code></td><td>76</td><td>3.5%</td><td>1.1 KB</td></tr>
+  <tr><td><code>Tube&lt;512&gt;</code></td><td>64</td><td>3.0%</td><td>2.1 KB</td></tr>
   <tr><th colspan="4">Drums</th></tr>
-  <tr><td><code>AnalogKick</code></td><td>235</td><td>12.3%</td><td>136 B</td></tr>
-  <tr><td><code>AnalogSnare</code></td><td>442</td><td>23.2%</td><td>340 B</td></tr>
-  <tr><td><code>HiHat</code></td><td>177</td><td>9.3%</td><td>412 B</td></tr>
-  <tr><td><code>SynthKick</code></td><td>249</td><td>13.1%</td><td>188 B</td></tr>
-  <tr><td><code>SynthSnare</code></td><td>203</td><td>10.7%</td><td>152 B</td></tr>
-  <tr><td><code>FmDrum</code></td><td>130</td><td>6.8%</td><td>80 B</td></tr>
+  <tr><td><code>AnalogKick</code></td><td>235</td><td>10.8%</td><td>136 B</td></tr>
+  <tr><td><code>AnalogSnare</code></td><td>442</td><td>20.3%</td><td>340 B</td></tr>
+  <tr><td><code>HiHat</code></td><td>177</td><td>8.1%</td><td>412 B</td></tr>
+  <tr><td><code>SynthKick</code></td><td>249</td><td>11.4%</td><td>188 B</td></tr>
+  <tr><td><code>SynthSnare</code></td><td>203</td><td>9.3%</td><td>152 B</td></tr>
+  <tr><td><code>FmDrum</code></td><td>132</td><td>6.1%</td><td>80 B</td></tr>
   <tr><th colspan="4">Spectral</th></tr>
-  <tr><td><code>FmOperators</code></td><td>409</td><td>21.5%</td><td>148 B</td></tr>
-  <tr><td><code>Xmod::morph</code></td><td>90</td><td>4.7%</td><td>&ndash;</td></tr>
+  <tr><td><code>FmOperators</code></td><td>410</td><td>18.8%</td><td>148 B</td></tr>
+  <tr><td><code>Xmod::morph</code></td><td>90</td><td>4.1%</td><td>&ndash;</td></tr>
   <tr><th colspan="4">Setters (cost per call)</th></tr>
-  <tr><td><code>Oscillator.setFrequency</code></td><td>21</td><td>1.1%</td><td>&ndash;</td></tr>
-  <tr><td><code>SVFilter.setFrequency</code></td><td>95</td><td>5.0%</td><td>&ndash;</td></tr>
-  <tr><td><code>Svf.setFrequency</code> (exact tan)</td><td>170</td><td>8.9%</td><td>&ndash;</td></tr>
-  <tr><td><code>Svf.setCoefficients</code> (fast tan)</td><td>56</td><td>2.9%</td><td>&ndash;</td></tr>
-  <tr><td><code>MoogFilter.setFrequency</code></td><td>183</td><td>9.6%</td><td>&ndash;</td></tr>
-  <tr><td><code>OnePole.setFrequency</code></td><td>164</td><td>8.6%</td><td>&ndash;</td></tr>
-  <tr><td><code>HarmonicOscillator.setFrequency</code></td><td>40</td><td>2.1%</td><td>&ndash;</td></tr>
-  <tr><td><code>StringSynthOscillator.setFrequency</code></td><td>103</td><td>5.4%</td><td>&ndash;</td></tr>
-  <tr><td><code>Tube.setFrequency</code></td><td>64</td><td>3.4%</td><td>&ndash;</td></tr>
-  <tr><td><code>FmOperators.setFrequency</code></td><td>161</td><td>8.4%</td><td>&ndash;</td></tr>
+  <tr><td><code>Oscillator.setFrequency</code></td><td>21</td><td>1.0%</td><td>&ndash;</td></tr>
+  <tr><td><code>SVFilter.setFrequency</code></td><td>95</td><td>4.4%</td><td>&ndash;</td></tr>
+  <tr><td><code>Svf.setFrequency</code> (exact tan)</td><td>170</td><td>7.8%</td><td>&ndash;</td></tr>
+  <tr><td><code>Svf.setCoefficients</code> (fast tan)</td><td>56</td><td>2.6%</td><td>&ndash;</td></tr>
+  <tr><td><code>MoogFilter.setFrequency</code></td><td>183</td><td>8.4%</td><td>&ndash;</td></tr>
+  <tr><td><code>OnePole.setFrequency</code></td><td>164</td><td>7.5%</td><td>&ndash;</td></tr>
+  <tr><td><code>HarmonicOscillator.setFrequency</code></td><td>40</td><td>1.8%</td><td>&ndash;</td></tr>
+  <tr><td><code>StringSynthOscillator.setFrequency</code></td><td>103</td><td>4.7%</td><td>&ndash;</td></tr>
+  <tr><td><code>Tube.setFrequency</code></td><td>64</td><td>2.9%</td><td>&ndash;</td></tr>
+  <tr><td><code>FmOperators.setFrequency</code></td><td>161</td><td>7.4%</td><td>&ndash;</td></tr>
 </table>
 <p><strong>Treat these as a rough guide.</strong> Each figure is one
 module timed on its own. In a full patch, modules share the flash cache,
@@ -430,7 +516,8 @@ patch: <code>patch_demo</code> adds up to 75% but measures 98%. Use the
 table to compare modules and spot the expensive ones, then check the
 real patch with <code>AudioEngine::cpuLoad()</code>.</p>
 <p><strong>The resonator dominates.</strong> It costs about 115 cycles plus
-49 per mode, so 24 modes alone use two-thirds of the CPU. 12&ndash;16 modes
+49 per mode, so 24 modes alone use 59% of the CPU (two-thirds on
+the F401). 12&ndash;16 modes
 is plenty for bells and bowls.</p>
 <p><strong>Some modules cost more when they work harder.</strong> The
 limiter costs about 40 cycles when the signal is below its threshold and
@@ -790,9 +877,16 @@ RandomSequence whose déjà-vu setting makes the variations loop.</p>
 <p>Not musical: instantiates every class so <code>pio run -e
 compile_all</code> proves the whole framework builds, and reports the
 combined RAM and flash.</p>
+<h3>oled</h3>
+<p>A knob on PA1 sets a tone's pitch, and a 128&times;64 OLED shows the
+pitch and the CPU load as numbers and bars. It shows the pattern for any
+display: read the controls and redraw on a <code>millis()</code> timer in
+<code>loop()</code>. The tone plays with no display attached.</p>
+<pre><code>pio run -e oled -t upload</code></pre>
+
 <h3>profile</h3>
 <p>Measures each module's cost on the board, in cycles per sample and as
-a share of the 1,905-cycle budget, and prints a table over USB serial
+a share of the 2,177-cycle budget (1,905 on the F401), and prints a table over USB serial
 every few seconds. It never starts the audio engine. A patch over 100%
 starves <code>loop()</code>, so its own meter can never print; the
 profiler reports regardless. The modules are set up as in
@@ -898,7 +992,8 @@ scale another (a knob setting an LFO's depth, an envelope as a VCA) use
 <code>setFrequency()</code> costs 170 cycles, or about 5 per sample when
 called every 32 samples. Wires may not form a loop.</p>
 <p>The tool prints a rough estimate of the patch's CPU and RAM and warns
-above 80% of the CPU or over 64 KB of RAM. CPU comes from the measured costs above
+above 80% of the CPU or over 128 KB of RAM (the F411's; an F401 patch
+must also stay under 64 KB). CPU comes from the measured costs above
 (the resonator's from its <code>setModes</code> value, about 115 + 49 per
 mode), plus each modulated setter's cost divided by
 <code>control_every</code>. RAM includes the framework's own 6 KB and
@@ -1237,6 +1332,7 @@ these changes:</p>
 <div><a href="reference.html#matrixkeypad">MatrixKeypad</a> — 5×5 diode matrix keypad — debounced input with per-key</div>
 <div><a href="reference.html#mpr121input">MPR121Input</a> — MPR121 capacitive touch controller — standalone I2C driver</div>
 <div><a href="reference.html#muxinput">MuxInput</a> — CD74HC4067 16-channel analog multiplexer driver.</div>
+<div><a href="reference.html#oled">Oled</a> — Driver for 128x64 monochrome I2C OLED displays (SSD1306, SH1106).</div>
 <div><a href="reference.html#switchinput">SwitchInput</a> — Debounced digital switch input with trigger/hold/release detection.</div>
 </div>
 <!-- /CATALOGUE -->
