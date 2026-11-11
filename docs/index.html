@@ -9,7 +9,14 @@
 <body>
 
 <header>
-  <h1>Buddha<span>Box</span></h1>
+  <!-- The enso, as in the patch editor: one brush stroke, left open. -->
+  <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
+    <path d="M73 20 A38 38 0 1 0 88 47" fill="none" stroke="#111"
+          stroke-width="11" stroke-linecap="round"/>
+    <path d="M88 47 A38 38 0 0 0 82 30" fill="none" stroke="#111"
+          stroke-width="4" stroke-linecap="round"/>
+  </svg>
+  <h1>BuddhaBox <small>framework guide</small></h1>
   <p>A header-only audio DSP framework for the STM32F411 Black Pill and an
      I2S DAC: 79 classes, from simple oscillators to Mutable Instruments'
      resonators, reverbs and drums.</p>
@@ -90,7 +97,7 @@ immediately:</p>
 platform = ststm32@15.4.1
 board = blackpill_f411ce   ; or blackpill_f401cc
 framework = arduino
-upload_protocol = dfu
+upload_protocol = stlink   ; or dfu: see "Build and upload"
 build_unflags = -Os
 build_flags =
     -O2
@@ -168,12 +175,40 @@ void loop() {
 <ol>
   <li><code>pio run</code> to build (it must compile cleanly before you
     flash).</li>
-  <li>Put the Black Pill in DFU mode: hold <strong>BOOT0</strong>, press and
-    release <strong>NRST</strong>, release <strong>BOOT0</strong>.</li>
-  <li><code>pio run -t upload</code>.</li>
+  <li>Connect an ST-Link to the Black Pill's debug header, the four pins
+    at the end of the board (wiring below).</li>
+  <li><code>pio run -t upload</code>. The board resets and runs the new
+    program; there are no buttons to press.</li>
   <li>Optional: <code>pio device monitor</code> to read
     <code>Serial</code> output, such as the CPU meter.</li>
 </ol>
+
+<h4>Wiring an ST-Link</h4>
+<p>Any ST-Link V2, including the cheap USB-stick clones, works. The
+header's silkscreen has five labels for four pins: "SW" names the header
+(Serial Wire, the debug protocol), and the pins are DIO, SCK, GND and
+3V3.</p>
+<table class="wiring-table">
+  <tr><th>Black Pill</th><th>ST-Link</th><th>Notes</th></tr>
+  <tr><td>DIO</td><td>SWDIO</td><td>Data</td></tr>
+  <tr><td>SCK</td><td>SWCLK</td><td>Clock</td></tr>
+  <tr><td>GND</td><td>GND</td><td></td></tr>
+  <tr><td>3V3</td><td>3.3V</td><td>Only when the board's USB is unplugged;
+    with USB in, the board powers itself, so leave this off</td></tr>
+</table>
+<p>The USB cable can stay plugged in while you upload, so the serial
+monitor carries on after the reset. On macOS 26, the first time you plug
+in an ST-Link (or a USB hub) the system asks whether to allow the
+accessory; until you allow it, the device half-connects and uploads
+fail.</p>
+
+<div class="note"><strong>No ST-Link?</strong> The chip's built-in USB
+bootloader (DFU) also works on some boards: set
+<code>upload_protocol = dfu</code>, then before each upload hold
+<strong>BOOT0</strong>, press and release <strong>NRST</strong>, and
+release <strong>BOOT0</strong>. On WeAct F411 boards it is unreliable:
+uploads often fail part-way, or the board never appears. An ST-Link
+costs a few pounds and avoids both problems.</div>
 
 <div class="tip"><strong>Is my patch too heavy?</strong> Call
 <code>AudioEngine::cpuLoad()</code> from <code>loop()</code> and print it.

@@ -27,7 +27,7 @@ Or add it to an existing project's `platformio.ini`:
 platform = ststm32@15.4.1
 board = blackpill_f411ce   ; or blackpill_f401cc
 framework = arduino
-upload_protocol = dfu
+upload_protocol = stlink   ; an ST-Link on the SW header; see the guide
 build_unflags = -Os   ; the core adds it after -O2, and it wins
 build_flags = -O2 -D PIO_FRAMEWORK_ARDUINO_ENABLE_CDC -D USBCON
 lib_deps = symlink://../buddhabox-framework
@@ -70,7 +70,8 @@ void loop() {}
 ## Commands
 
 - `pio run` — build every example
-- `pio run -e singing_bowls -t upload` — flash one (DFU: hold BOOT0, tap NRST)
+- `pio run -e singing_bowls -t upload` — flash one with an ST-Link (DIO to
+  SWDIO, SCK to SWCLK, GND; no buttons to press)
 - `pio device monitor` — the examples print their CPU load; the blue LED
   lights if the audio ever overruns (`-D BB_OVERRUN_LED=0` turns that off)
 - `pio run -e profile -t upload` — measure each module's cycles per sample

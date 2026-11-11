@@ -35,14 +35,17 @@ PLATFORMIO_INI = """\
 ; {name} — built on the BuddhaBox framework.
 ;
 ;   pio run              build
-;   pio run -t upload    flash (DFU: hold BOOT0, tap NRST, release BOOT0)
+;   pio run -t upload    flash with an ST-Link (DIO, SCK, GND)
 ;   pio device monitor   serial output
 
 [env:{name}]
 platform = ststm32@15.4.1
 board = blackpill_f411ce   ; or blackpill_f401cc
 framework = arduino
-upload_protocol = dfu
+; An ST-Link on the SW header. The ROM DFU bootloader on WeAct F411
+; boards is unreliable; with a board that does take it, use dfu and the
+; BOOT0 dance.
+upload_protocol = stlink
 ; The STM32 core adds -Os after build_flags and GCC obeys the last -O,
 ; so remove it or -O2 is silently ignored.
 build_unflags = -Os

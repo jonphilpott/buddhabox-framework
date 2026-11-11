@@ -25,7 +25,8 @@ The project has an educational focus: highly documented code and a
   drum_machine, custom_voice, compile_all, profile, profile_all, patch_minimal,
   patch_demo, patch_hardware, patch_param, minimal_f401, oled,
   aeolian_harp, easel)
-- **Upload:** `pio run -e <env> -t upload` (DFU: hold BOOT0, tap NRST, release BOOT0)
+- **Upload:** `pio run -e <env> -t upload` (ST-Link on the SW header: DIO to
+  SWDIO, SCK to SWCLK, GND; DFU is unreliable on WeAct F411 boards)
 - **Serial Monitor:** `pio device monitor` (examples print `AudioEngine::cpuLoad()`)
 - **Measure CPU:** `pio run -e profile -t upload` prints cycles per sample per module
   (works even when a patch is over budget); `-e profile_all` covers every audio
