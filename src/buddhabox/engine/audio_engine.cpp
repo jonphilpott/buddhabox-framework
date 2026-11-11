@@ -140,11 +140,19 @@ namespace AudioEngine {
 void configureI2SClock() {
   RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
 
-  // Configure PLLI2S to generate 44.1kHz clock. Its input is the 25 MHz
-  // crystal divided by the main PLL's PLLM (25 on both the F401 and F411
-  // Black Pill variants), so 1 MHz x 192 / 2 = 96 MHz on either board,
-  // and the HAL divides that down to 44.1 kHz.
+  // Configure PLLI2S to generate 44.1kHz clock: 1 MHz x 192 / 2 = 96 MHz,
+  // which the HAL then divides down to 44.1 kHz.
+  //
+  // Where the 1 MHz comes from differs between the chips:
+  // - F401: PLLI2S shares the main PLL's input divider (PLLM = 25 in the
+  //   Black Pill's clock setup), so the 25 MHz crystal is already 1 MHz.
+  // - F411: PLLI2S has its OWN input divider, PLLI2SM. Left at 0 (from
+  //   the {0} above) the PLL never starts, the I2S peripheral never
+  //   clocks, and the DAC gets silence. Set it to 25 to match.
   PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_I2S;
+#if defined(STM32F411xE)
+  PeriphClkInitStruct.PLLI2S.PLLI2SM = 25;
+#endif
   PeriphClkInitStruct.PLLI2S.PLLI2SN = 192;
   PeriphClkInitStruct.PLLI2S.PLLI2SR = 2;
   HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
