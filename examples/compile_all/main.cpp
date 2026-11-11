@@ -78,6 +78,8 @@ ClockToRamp clockToRamp;
 SegmentEnvelope segmentEnvelope;
 Lag lag;
 Slope slopeGen;
+Pulser pulser;
+SequentialVoltage sequentialVoltage;
 
 // ── Dynamics ────────────────────────────────────────────────────────────
 Vactrol vactrol;
@@ -87,6 +89,7 @@ Compressor compressor;
 
 // ── Effects ─────────────────────────────────────────────────────────────
 Reverb<4096> reverb;
+SpringReverb<> springReverb;
 Chorus<2048> chorus;
 Ensemble<4096> ensemble;
 Diffuser<2048> diffuser;
@@ -147,12 +150,15 @@ void audioCallback(int16_t *buffer, uint16_t length) {
     acc += colour.getNote(0, colour.getMelody(i)) * 0.001f;
     acc += clockToRamp.process(false) + segmentEnvelope.process(false);
     acc += lag.process(in, 0.5f, 0.5f) + slopeGen.process(false);
+    if (pulser.process())
+      acc += sequentialVoltage.advance() + pulser.value();
 
     acc += vactrol.process(in) + vactrolLpg.process(in);
     acc += follower.process(in) + compressor.process(in);
 
     float l = in, r = in;
     reverb.process(l, r);
+    springReverb.process(l, r);
     chorus.process(l, r);
     ensemble.process(l, r);
     diffuser.process(l, r);

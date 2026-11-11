@@ -455,6 +455,7 @@ shown; a smaller buffer saves RAM, not cycles.</p>
   <tr><td><code>AllpassFilter&lt;512&gt;</code></td><td>67</td><td>3.1%</td><td>1.0 KB</td></tr>
   <tr><th colspan="4">Modulation</th></tr>
   <tr><td><code>Envelope</code></td><td>9</td><td>0.4%</td><td>20 B</td></tr>
+  <tr><td><code>Pulser</code></td><td>9</td><td>0.4%</td><td>16 B</td></tr>
   <tr><td><code>SegmentEnvelope</code></td><td>76</td><td>3.5%</td><td>108 B</td></tr>
   <tr><td><code>Slope</code></td><td>216</td><td>9.9%</td><td>60 B</td></tr>
   <tr><td><code>SlewLimiter</code></td><td>12</td><td>0.6%</td><td>12 B</td></tr>
@@ -482,6 +483,7 @@ shown; a smaller buffer saves RAM, not cycles.</p>
   <tr><th colspan="4">Effects</th></tr>
   <tr><td><code>DelayLine&lt;1024&gt;</code> (write and read)</td><td>51</td><td>2.3%</td><td>2.0 KB</td></tr>
   <tr><td><code>Reverb&lt;4096&gt;</code> (stereo)</td><td>510</td><td>23.4%</td><td>8.2 KB</td></tr>
+  <tr><td><code>SpringReverb&lt;2048&gt;</code> (stereo)</td><td>466</td><td>21.4%</td><td>16.4 KB</td></tr>
   <tr><td><code>Chorus&lt;2048&gt;</code> (stereo)</td><td>257</td><td>11.8%</td><td>4.1 KB</td></tr>
   <tr><td><code>Ensemble&lt;4096&gt;</code> (stereo)</td><td>399</td><td>18.4%</td><td>8.1 KB</td></tr>
   <tr><td><code>Diffuser&lt;2048&gt;</code> (stereo)</td><td>366</td><td>16.8%</td><td>4.1 KB</td></tr>
@@ -903,6 +905,27 @@ series as gusts build. Pink noise adds the rush of air, and a long
 reverb the space. About half the F411's CPU; no controls.</p>
 <pre><code>pio run -e aeolian_harp -t upload</code></pre>
 
+<h3>easel</h3>
+<p>A slowly evolving patch in the style of the Buchla Music Easel, built
+from the modules that copy its parts. Nothing is struck: the sound never
+stops. A <code>Pulser</code>, about every 7&nbsp;seconds, steps a
+five-note <code>SequentialVoltage</code> pattern in D minor and restarts a
+slow envelope. The complex oscillator
+is a sine, frequency-modulated by a triangle about a fifth above and
+folded by a <code>TableWavefolder</code>. The ratio between the two
+oscillators wanders a few cents, so the FM sidebands beat and churn, and
+an imaginary hand sweeps the folding and FM depth over tens of seconds.
+The complex oscillator runs at twice the sample rate, with an
+18&nbsp;kHz low-pass before every second sample is dropped, which cuts
+aliasing by 14 to 16&nbsp;dB on notes from about 600&nbsp;Hz up. Two
+<code>VactrolLpg</code>s in level mode shape it: one swells with the
+envelope, the other carries the modulation oscillator as a drone. A
+<code>SpringReverb</code> is the tank. 74% of the CPU, measured. The
+header comment says how to turn it into the Easel's quick, struck
+"bongo" sound. Plays on its own; set <code>kKnobs</code> to read pots on
+PA0&ndash;PA3 (timbre, FM depth, pulser rate, swell length).</p>
+<pre><code>pio run -e easel -t upload</code></pre>
+
 <h3>oled</h3>
 <p>A knob on PA1 sets a tone's pitch, and a 128&times;64 OLED shows the
 pitch and the CPU load as numbers and bars. It shows the pattern for any
@@ -1299,10 +1322,12 @@ these changes:</p>
 <div><a href="reference.html#hysteresisquantizer">HysteresisQuantizer</a> — Turns a 0..1 knob into N steps without flicker at the edges.</div>
 <div><a href="reference.html#lag">Lag</a> — Clock-synchronised glide between steps: Marbles&#x27; &quot;steps&quot; control.</div>
 <div><a href="reference.html#lorenz">Lorenz</a> — Lorenz attractor: a chaotic, never-repeating modulation source.</div>
+<div><a href="reference.html#pulser">Pulser</a> — A timing pulse generator that fires once or repeats, Buchla</div>
 <div><a href="reference.html#quantizer">Quantizer</a> — Weighted scale quantizer from Marbles.</div>
 <div><a href="reference.html#randomsequence">RandomSequence</a> — Random values that can loop: Marbles&#x27; &quot;déjà vu&quot; control.</div>
 <div><a href="reference.html#sampleandhold">SampleAndHold</a> — Sample and Hold — captures and freezes an input on a trigger.</div>
 <div><a href="reference.html#segmentenvelope">SegmentEnvelope</a> — Peaks&#x27; multi-segment envelope: ADSR, AD, AR, looping, or custom.</div>
+<div><a href="reference.html#sequentialvoltage">SequentialVoltage</a> — A five-step sequencer, after the Buchla Easel&#x27;s sequential</div>
 <div><a href="reference.html#slewlimiter">SlewLimiter</a> — Slew limiter with independent rise and fall times.</div>
 <div><a href="reference.html#slope">Slope</a> — Tides 2 function generator: envelope, LFO or oscillator.</div>
 </div>
@@ -1330,6 +1355,7 @@ these changes:</p>
 <div><a href="reference.html#overdrive">Overdrive</a> — Level-compensated soft-clipping overdrive from Plaits.</div>
 <div><a href="reference.html#pitchshifter">PitchShifter</a> — Clouds&#x27; delay-line pitch shifter.</div>
 <div><a href="reference.html#reverb">Reverb</a> — Stereo plate-style reverb from Rings, Elements and Clouds.</div>
+<div><a href="reference.html#springreverb">SpringReverb</a> — A two-spring tank: the drippy, boingy reverb of guitar amps and</div>
 <div><a href="reference.html#tablewavefolder">TableWavefolder</a> — Plaits&#x27; table wavefolder: sine fold and analog-circuit fold.</div>
 <div><a href="reference.html#wavefolder">WaveFolder</a> — Single-stage wave folder for west-coast/Buchla-style synthesis.</div>
 </div>

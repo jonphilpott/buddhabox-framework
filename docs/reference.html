@@ -1710,6 +1710,43 @@ float pan = 0.5f + 0.5f * chaos.y();</code></pre>
 <div class="method-block"><div class="method-sig">float y() const</div><div class="method-desc"><div class="method-returns">Returns: y, about ±1: like x but leading it</div></div></div>
 <div class="method-block"><div class="method-sig">float z() const</div><div class="method-desc"><div class="method-returns">Returns: z, about ±1: rises and falls with each loop</div></div></div>
 </div>
+<h3 id="pulser-h">pulser.h</h3>
+<p class="include"><code>#include "buddhabox/mod/pulser.h"</code> — A timing pulse generator that fires once or repeats, Buchla</p>
+<p>Easel style.</p>
+<p>The pulser is the heartbeat of a Buchla Music Easel patch. It fires a pulse, either once when triggered or repeatedly at a set period. Each pulse typically strikes a low-pass gate, starts an envelope and steps the sequencer. Between pulses it also outputs a falling ramp, from 1.0 at the pulse down to 0.0 just before the next, which makes a handy modulation voltage that is locked to the rhythm.</p>
+<p>HOW IT DIFFERS FROM TempoClock (clock.h): TempoClock thinks in BPM and note divisions and only ticks. Pulser thinks in seconds, can fire just once, and gives the ramp as well.</p>
+<h5>How It Works</h5>
+<p>a phase runs from 0 to 1 over one period. When it wraps, a pulse fires (LOOP), or the pulser stops and waits for trigger() (ONCE).</p>
+<p>phase   1 ┤  ╱│  ╱│  ╱│ │ ╱ │ ╱ │ ╱ │ 0 ┼╱  │╱  │╱  │ pulses    ^   ^   ^   ^   process() returns true here value()   is 1 - phase: a falling ramp</p>
+<h5>Cost</h5>
+<p>a few cycles a sample.</p>
+<div class="module-card" id="pulser">
+<h4>Pulser</h4>
+<div class="method-sig">class Pulser</div>
+<p>A pulse generator with a period in seconds and a falling-ramp output.</p>
+<p class="example-label">Example — strike a low-pass gate twice a second:</p>
+<pre><code>Pulser pulser;
+pulser.setPeriod(0.5f);
+
+// In audio callback, every sample:
+if (pulser.process())
+  lpg.trigger();</code></pre>
+<p class="example-label">Example — one pulse per key press:</p>
+<pre><code>pulser.setMode(Pulser::ONCE);
+pulser.trigger(); // from a key handler; process() returns true next</code></pre>
+<p class="example-label">Instantiation</p><pre><code>Pulser name;</code></pre>
+<div class="method-block"><div class="method-sig">enum Mode</div><div class="method-desc"><p>ONCE fires only when trigger() is called; LOOP repeats.</p></div></div>
+<div class="method-block"><div class="method-sig">void init(float sampleRate = SAMPLE_RATE)</div><div class="method-desc"><p>Reset to the defaults: LOOP mode, a 1-second period, and a pulse waiting to fire on the first process().</p>
+<div class="method-param">Param <code>sampleRate</code> — Calls to process() per second (pass the block rate if you call it once per block)</div></div></div>
+<div class="method-block"><div class="method-sig">void setPeriod(float seconds)</div><div class="method-desc"><p>Time between pulses in LOOP mode, and the length of the ramp. One division: fine to call every block (e.g. from a knob).</p>
+<div class="method-param">Param <code>seconds</code> — Period in seconds; clamped to at least 1 ms</div></div></div>
+<div class="method-block"><div class="method-sig">void setMode(Mode mode)</div><div class="method-desc"><p>Switch between firing once and repeating. Switching to LOOP starts the pulser running from wherever its phase is.</p>
+<div class="method-param">Param <code>mode</code> — Pulser::ONCE or Pulser::LOOP</div></div></div>
+<div class="method-block"><div class="method-sig">void trigger()</div><div class="method-desc"><p>Fire a pulse on the next process() and restart the ramp. Works in both modes: in LOOP it also resets the rhythm to start from now.</p></div></div>
+<div class="method-block"><div class="method-sig">bool process()</div><div class="method-desc"><p>Advance one sample.</p>
+<div class="method-returns">Returns: true on the sample a pulse fires, false otherwise</div></div></div>
+<div class="method-block"><div class="method-sig">float value() const</div><div class="method-desc"><div class="method-returns">Returns: The falling ramp: 1.0 at a pulse, down to 0.0</div></div></div>
+</div>
 <h3 id="quantizer-h">quantizer.h</h3>
 <p class="include"><code>#include "buddhabox/mod/quantizer.h"</code> — Weighted scale quantizer from Marbles.</p>
 <p>Snaps a pitch to a scale, with one control that gradually thins the scale down to its most important notes.</p>
@@ -1897,6 +1934,39 @@ float lfo = env.process(true);</code></pre>
 <div class="method-returns">Returns: The envelope level, 0.0 to 1.0</div></div></div>
 <div class="method-block"><div class="method-sig">float value() const</div><div class="method-desc"><div class="method-returns">Returns: The level from the last process() call</div></div></div>
 <div class="method-block"><div class="method-sig">bool active() const</div><div class="method-desc"><div class="method-returns">Returns: true while the envelope is running (not finished)</div></div></div>
+</div>
+<h3 id="sequential-voltage-h">sequential_voltage.h</h3>
+<p class="include"><code>#include "buddhabox/mod/sequential_voltage.h"</code> — A five-step sequencer, after the Buchla Easel&#x27;s sequential</p>
+<p>voltage source.</p>
+<p>Holds up to five values and steps through them, one step per call to advance(). On the Easel each step is a slider and the pulser does the stepping; the output usually sets the oscillator&#x27;s pitch, but it can drive anything: timbre, modulation depth, the pulser&#x27;s own period.</p>
+<p>Five steps is short on purpose. Against a pulser running at a different rate, or an envelope whose length doesn&#x27;t divide evenly, a short pattern drifts in and out of phase with everything else, which is where much of the Easel&#x27;s character comes from.</p>
+<h5>Cost</h5>
+<p>nothing per sample; it only works when advanced.</p>
+<div class="module-card" id="sequentialvoltage">
+<h4>SequentialVoltage</h4>
+<div class="method-sig">class SequentialVoltage</div>
+<p>Up to five values, stepped through in a loop.</p>
+<p class="example-label">Example — a pitch pattern stepped by a pulser:</p>
+<pre><code>SequentialVoltage seq;
+const float steps[] = {0, 7, 3, 10, 5}; // semitones
+for (int i = 0; i &lt; 5; i++)
+  seq.setStep(i, steps[i]);
+
+// In audio callback:
+if (pulser.process())
+  osc.setFrequency(110.0f * semitonesToRatio(seq.advance()));</code></pre>
+<p class="example-label">Instantiation</p><pre><code>SequentialVoltage name;</code></pre>
+<div class="method-block"><div class="method-sig">static const int kMaxSteps = 5</div><div class="method-desc"><p>The Easel&#x27;s sequencer has five steps.</p></div></div>
+<div class="method-block"><div class="method-sig">void setStep(int index, float value)</div><div class="method-desc"><p>Set one step&#x27;s value.</p>
+<div class="method-param">Param <code>index</code> — Step 0..4 (others are ignored)</div>
+<div class="method-param">Param <code>value</code> — Any value: semitones, 0..1 levels, Hz...</div></div></div>
+<div class="method-block"><div class="method-sig">void setLength(int steps)</div><div class="method-desc"><p>How many steps to loop through, from step 0.</p>
+<div class="method-param">Param <code>steps</code> — 1..5</div></div></div>
+<div class="method-block"><div class="method-sig">float advance()</div><div class="method-desc"><p>Move to the next step, wrapping after the last.</p>
+<div class="method-returns">Returns: The new step&#x27;s value</div></div></div>
+<div class="method-block"><div class="method-sig">void reset()</div><div class="method-desc"><p>Make the next advance() land on step 0.</p></div></div>
+<div class="method-block"><div class="method-sig">float value() const</div><div class="method-desc"><div class="method-returns">Returns: The current step&#x27;s value, without advancing</div></div></div>
+<div class="method-block"><div class="method-sig">int step() const</div><div class="method-desc"><div class="method-returns">Returns: The current step number, 0..length - 1</div></div></div>
 </div>
 <h3 id="slew-h">slew.h</h3>
 <p class="include"><code>#include "buddhabox/mod/slew.h"</code> — Slew limiter with independent rise and fall times.</p>
@@ -2739,6 +2809,44 @@ reverb.process(l, r); // in place</code></pre>
 <div class="method-block"><div class="method-sig">void process(float &amp;left, float &amp;right)</div><div class="method-desc"><p>Process one stereo sample in place.</p>
 <div class="method-param">Param <code>left</code> — Left in/out</div>
 <div class="method-param">Param <code>right</code> — Right in/out</div></div></div>
+</div>
+<h3 id="spring-reverb-h">spring_reverb.h</h3>
+<p class="include"><code>#include "buddhabox/fx/spring_reverb.h"</code> — A two-spring tank: the drippy, boingy reverb of guitar amps and</p>
+<p>the Buchla Easel.</p>
+<p>A spring reverb sends sound down a coiled spring and picks it up at the other end. A spring is dispersive: different frequencies travel along it at different speeds. So a click goes in and comes out smeared into a &quot;chirp&quot;, a quick whistling sweep. The sound bounces back and forth along the spring, and every trip smears it further, which turns each echo into a longer chirp: the &quot;drip&quot; and &quot;boing&quot; a hall reverb never makes.</p>
+<p>HOW THIS MODEL WORKS (after Parker and Valimaki&#x27;s spring models):</p>
+<p>in ─► high-pass ─► (+) ─► 12 all-passes ─► delay ─► low-pass ─┬─► out ▲     (the chirp)    (one trip)  (losses) │ └──────────── x feedback ◄────────────────┘</p>
+<ul><li>High-pass: real tanks pass little bass, which keeps them from booming.</li><li>Dispersion: a chain of all-pass filters. An all-pass passes every frequency at the same level but delays some more than others, so in a long enough chain a click spreads out into a chirp. Each one is &quot;stretched&quot; (it uses the sample 4 back, not 1 back), which moves the chirp into the spring&#x27;s range, below about 5.5 kHz.</li><li>Delay: the time for one trip along the spring, 35 to 42 ms.</li><li>Low-pass and feedback: each trip loses some treble and some level, so echoes get darker and quieter. The low-pass also removes the stretched all-passes&#x27; copies of the chirp above 5.5 kHz.</li></ul>
+<p>Two springs of different lengths, one per output, give a wide stereo image from a mono input, as real two- and three-spring tanks do.</p>
+<h5>Cost</h5>
+<p>466 cycles a sample on the F411 (21% of the budget), nearly all of it the 24 all-pass sections; 2 x SIZE x 4 bytes of RAM, 16 KB at the default size.</p>
+<div class="module-card" id="springreverb">
+<h4>SpringReverb</h4>
+<div class="method-sig">template &lt;uint16_t SIZE = 2048&gt; class SpringReverb</div>
+<p>A stereo spring reverb tank.</p>
+<p class="example-label">Example — on a voice&#x27;s output:</p>
+<pre><code>SpringReverb&lt;&gt; spring;
+spring.setTime(0.8f);   // long, splashy tail
+spring.setAmount(0.35f);
+
+// In audio callback:
+float left = voice, right = voice;
+spring.process(left, right);</code></pre>
+<div class="method-param">Template <code>SIZE</code> — Delay per spring in samples; must hold the longer trip (1871 samples), so 2048 is the smallest that works</div>
+<p class="example-label">Instantiation</p><pre><code>SpringReverb&lt;&gt; name;   // template defaults: uint16_t SIZE = 2048</code></pre>
+<div class="method-block"><div class="method-sig">void init(float sampleRate = SAMPLE_RATE)</div><div class="method-desc"><p>Clear the springs and set the defaults (time 0.75, tone 0.5, chirp 0.5, amount 0.3).</p>
+<div class="method-param">Param <code>sampleRate</code> — Sample rate in Hz</div></div></div>
+<div class="method-block"><div class="method-sig">void setTime(float x)</div><div class="method-desc"><p>How long the tail rings: the feedback around each spring.</p>
+<div class="method-param">Param <code>x</code> — 0.0 = one echo, 1.0 = very long (about 5 seconds)</div></div></div>
+<div class="method-block"><div class="method-sig">void setTone(float x)</div><div class="method-desc"><p>Brightness of the tank: the loop&#x27;s low-pass cutoff, 1.5 to 6 kHz. Uses expf(): control rate.</p>
+<div class="method-param">Param <code>x</code> — 0.0 = dark and dull, 1.0 = bright and splashy</div></div></div>
+<div class="method-block"><div class="method-sig">void setChirp(float x)</div><div class="method-desc"><p>How strongly each echo is smeared into a chirp: the all-passes&#x27; coefficient.</p>
+<div class="method-param">Param <code>x</code> — 0.0 = a light chirp, 1.0 = a deep &quot;pew&quot; on every echo</div></div></div>
+<div class="method-block"><div class="method-sig">void setAmount(float x)</div><div class="method-desc"><p>Dry/wet mix, as Reverb&#x27;s.</p>
+<div class="method-param">Param <code>x</code> — 0.0 = dry only, 1.0 = reverb only</div></div></div>
+<div class="method-block"><div class="method-sig">void process(float &amp;left, float &amp;right)</div><div class="method-desc"><p>Process one stereo sample in place. Both springs hear the mono sum; the left output comes from one spring and the right from the other.</p>
+<div class="method-param">Param <code>left</code> — Left sample, replaced with the mix</div>
+<div class="method-param">Param <code>right</code> — Right sample, replaced with the mix</div></div></div>
 </div>
 <h3 id="table-wavefolder-h">table_wavefolder.h</h3>
 <p class="include"><code>#include "buddhabox/fx/table_wavefolder.h"</code> — Plaits&#x27; table wavefolder: sine fold and analog-circuit fold.</p>

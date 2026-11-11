@@ -1588,6 +1588,54 @@
   "ram": 24,
   "ram_size": null
  },
+ "Pulser": {
+  "header": "buddhabox/mod/pulser.h",
+  "category": "mod",
+  "brief": "",
+  "template": null,
+  "call": "process",
+  "returns": "bool",
+  "inputs": [],
+  "outputs": [
+   {
+    "name": "out",
+    "expr": "({id}_v_ ? 1.0f : 0.0f)"
+   },
+   {
+    "name": "value",
+    "expr": "{id}.value()"
+   }
+  ],
+  "params": {
+   "setPeriod": {
+    "args": [
+     {
+      "name": "seconds",
+      "type": "float",
+      "default": null
+     }
+    ],
+    "cycles": null
+   },
+   "setMode": {
+    "args": [
+     {
+      "name": "mode",
+      "type": "Mode",
+      "default": null
+     }
+    ],
+    "cycles": null
+   }
+  },
+  "events": [
+   "trigger"
+  ],
+  "cycles": 9.0,
+  "scaling": null,
+  "ram": 16,
+  "ram_size": null
+ },
  "Quantizer": {
   "header": "buddhabox/mod/quantizer.h",
   "category": "mod",
@@ -3001,6 +3049,83 @@
   "scaling": null,
   "ram": 8392,
   "ram_size": 4096
+ },
+ "SpringReverb": {
+  "header": "buddhabox/fx/spring_reverb.h",
+  "category": "fx",
+  "brief": "",
+  "template": "uint16_t SIZE = 2048",
+  "call": "process",
+  "returns": "stereo",
+  "inputs": [
+   {
+    "name": "left",
+    "type": "float",
+    "default": "0.0f"
+   },
+   {
+    "name": "right",
+    "type": "float",
+    "default": "0.0f"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "left",
+    "expr": "{id}_left_"
+   },
+   {
+    "name": "right",
+    "expr": "{id}_right_"
+   }
+  ],
+  "params": {
+   "setTime": {
+    "args": [
+     {
+      "name": "x",
+      "type": "float",
+      "default": null
+     }
+    ],
+    "cycles": null
+   },
+   "setTone": {
+    "args": [
+     {
+      "name": "x",
+      "type": "float",
+      "default": null
+     }
+    ],
+    "cycles": null
+   },
+   "setChirp": {
+    "args": [
+     {
+      "name": "x",
+      "type": "float",
+      "default": null
+     }
+    ],
+    "cycles": null
+   },
+   "setAmount": {
+    "args": [
+     {
+      "name": "x",
+      "type": "float",
+      "default": null
+     }
+    ],
+    "cycles": null
+   }
+  },
+  "events": [],
+  "cycles": 466.0,
+  "scaling": null,
+  "ram": 16824,
+  "ram_size": 2048
  },
  "TableWavefolder": {
   "header": "buddhabox/fx/table_wavefolder.h",

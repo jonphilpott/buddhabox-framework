@@ -192,6 +192,7 @@ AllpassFilter<512> allpass;
 Envelope adsr;
 SegmentEnvelope segmentEnvelope;
 Slope slopeGen;
+Pulser pulser;
 SlewLimiter slewLimiter;
 Lag lag;
 SampleAndHold sah;
@@ -219,6 +220,7 @@ Compressor compressor;
 // ── Effects ─────────────────────────────────────────────────────────────
 DelayLine<1024> delayLine;
 Reverb<4096> reverb;
+SpringReverb<> springReverb;
 Chorus<2048> chorus;
 Ensemble<4096> ensemble;
 Diffuser<2048> diffuser;
@@ -358,6 +360,8 @@ void loop() {
   });
   PROFILE("SegmentEnvelope", "mod/segment_envelope.h", sizeof(segmentEnvelope),
           acc += segmentEnvelope.process(GATE));
+  PROFILE("Pulser", "mod/pulser.h", sizeof(pulser),
+          acc += pulser.process() + pulser.value());
   PROFILE("Slope", "mod/slope.h", sizeof(slopeGen),
           acc += slopeGen.process(GATE));
   PROFILE("SlewLimiter", "mod/slew.h", sizeof(slewLimiter),
@@ -412,6 +416,12 @@ void loop() {
     delayLine.write(in);
     acc += delayLine.read(100.5f);
   });
+  PROFILE("SpringReverb<2048> (stereo)", "fx/spring_reverb.h",
+          sizeof(springReverb), {
+            float l = in, r = -in;
+            springReverb.process(l, r);
+            acc += l + r;
+          });
   PROFILE("Reverb<4096> (stereo)", "fx/reverb.h", sizeof(reverb), {
     float l = in, r = -in;
     reverb.process(l, r);

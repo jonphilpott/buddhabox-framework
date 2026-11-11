@@ -77,10 +77,12 @@
 #include "buddhabox/mod/lag.h"
 #include "buddhabox/mod/lorenz.h"
 #include "buddhabox/mod/lut_slope.h"
+#include "buddhabox/mod/pulser.h"
 #include "buddhabox/mod/quantizer.h"
 #include "buddhabox/mod/random_sequence.h"
 #include "buddhabox/mod/sample_and_hold.h"
 #include "buddhabox/mod/segment_envelope.h"
+#include "buddhabox/mod/sequential_voltage.h"
 #include "buddhabox/mod/slew.h"
 #include "buddhabox/mod/slope.h"
 
@@ -103,6 +105,7 @@
 #include "buddhabox/fx/overdrive.h"
 #include "buddhabox/fx/pitch_shifter.h"
 #include "buddhabox/fx/reverb.h"
+#include "buddhabox/fx/spring_reverb.h"
 #include "buddhabox/fx/table_wavefolder.h"
 #include "buddhabox/fx/wave_folder.h"
 

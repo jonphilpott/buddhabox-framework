@@ -28,6 +28,7 @@ VowelFilter,filter/vowel.h,199.0,176,9.14
 Hilbert,filter/hilbert.h,258.0,212,11.85
 AllpassFilter<512>,filter/allpass.h,67.0,1036,3.08
 Envelope,mod/envelope.h,8.7,20,0.40
+Pulser,mod/pulser.h,9.0,16,0.41
 SegmentEnvelope,mod/segment_envelope.h,76.1,108,3.49
 Slope,mod/slope.h,216.1,60,9.93
 SlewLimiter,mod/slew.h,12.0,12,0.55
@@ -51,6 +52,7 @@ VactrolLpg,dynamics/vactrol_lpg.h,92.1,72,4.23
 Follower,dynamics/follower.h,141.9,92,6.52
 Compressor,dynamics/compressor.h,158.0,44,7.26
 DelayLine<1024> (write and read),fx/delay.h,51.0,2050,2.34
+SpringReverb<2048> (stereo),fx/spring_reverb.h,466.0,16824,21.41
 Reverb<4096> (stereo),fx/reverb.h,509.5,8392,23.41
 Chorus<2048> (stereo),fx/chorus.h,257.4,4188,11.83
 Ensemble<4096> (stereo),fx/ensemble.h,399.4,8292,18.35
