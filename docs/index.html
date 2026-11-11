@@ -90,6 +90,15 @@ Pill's 96 MHz Cortex-M4 and 128 KB of RAM. The older F401 Black Pill
 <pre><code>python3 tools/new_project.py ../my_synth
 python3 tools/new_project.py ../bells --example custom_voice
 cd ../my_synth &amp;&amp; pio run</code></pre>
+<p>Each project has its own <code>platformio.ini</code>, so one board can
+upload with an ST-Link and another with DFU without touching the
+framework. For example, <code>analogRead()</code> gives the ADC only 15
+clocks to sample by default: enough for 10k pots, not for 100k ones,
+which read low near mid-travel and bleed into the next pot. A project
+using 100k pots can uncomment
+<code>-D ADC_SAMPLINGTIME=ADC_SAMPLETIME_480CYCLES</code> in its
+<code>build_flags</code>, or put a 100&nbsp;nF capacitor from each wiper
+to ground.</p>
 <p>To add the framework to an existing PlatformIO project instead, point <code>lib_deps</code> at this repository. A <code>symlink://</code>
 path uses your local checkout directly, so edits to the framework show up
 immediately:</p>

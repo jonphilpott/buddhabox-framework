@@ -224,6 +224,8 @@ public:
 
   /**
    * Start I2C on PB8/PB9 at 400 kHz, set the display up and clear it.
+   * Called in the first 100 ms after power-up, it first waits out the
+   * rest of them so the panel has finished resetting.
    *
    * @return true if the display answered, false if nothing is at the
    *         address (check wiring, power and the address). Safe to call
@@ -233,6 +235,16 @@ public:
    *   if (!oled.begin()) Serial.println("No OLED");
    */
   bool begin() {
+    // Step 0: give the panel time to wake. The board is running its
+    // code within a few milliseconds of power-up, but the module's own
+    // reset circuit holds the controller in reset a little longer, and
+    // commands sent then are lost: the screen stays dark until the next
+    // reset (which is why it works after an upload, when the display
+    // stays powered, but not after plugging in). 100 ms from boot is
+    // plenty; called later, this waits for nothing.
+    if (millis() < 100)
+      delay(100 - millis());
+
     // Same pins as MPR121Input, so the two can share the bus.
     Wire.setSDA(PB9);
     Wire.setSCL(PB8);
