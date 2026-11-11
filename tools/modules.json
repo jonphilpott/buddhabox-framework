@@ -1011,6 +1011,54 @@
   "ram": 28,
   "ram_size": null
  },
+ "Ms20Filter": {
+  "header": "buddhabox/filter/ms20_filter.h",
+  "category": "filter",
+  "brief": "",
+  "template": null,
+  "call": "process",
+  "returns": "float",
+  "inputs": [
+   {
+    "name": "in",
+    "type": "float",
+    "default": null
+   }
+  ],
+  "outputs": [
+   {
+    "name": "out",
+    "expr": "{id}_v_"
+   }
+  ],
+  "params": {
+   "setFrequency": {
+    "args": [
+     {
+      "name": "hz",
+      "type": "float",
+      "default": null
+     }
+    ],
+    "cycles": 233.0
+   },
+   "setResonance": {
+    "args": [
+     {
+      "name": "res",
+      "type": "float",
+      "default": null
+     }
+    ],
+    "cycles": null
+   }
+  },
+  "events": [],
+  "cycles": 72.0,
+  "scaling": null,
+  "ram": 40,
+  "ram_size": null
+ },
  "OnePole": {
   "header": "buddhabox/filter/one_pole.h",
   "category": "filter",

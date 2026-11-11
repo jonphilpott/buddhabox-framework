@@ -24,7 +24,7 @@ The project has an educational focus: highly documented code and a
 - **Build one:** `pio run -e singing_bowls` (envs: minimal, singing_bowls,
   drum_machine, custom_voice, compile_all, profile, profile_all, patch_minimal,
   patch_demo, patch_hardware, patch_param, minimal_f401, oled,
-  aeolian_harp, easel)
+  aeolian_harp, easel, acid)
 - **Upload:** `pio run -e <env> -t upload` (ST-Link on the SW header: DIO to
   SWDIO, SCK to SWCLK, GND; DFU is unreliable on WeAct F411 boards)
 - **Serial Monitor:** `pio device monitor` (examples print `AudioEngine::cpuLoad()`)

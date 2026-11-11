@@ -56,6 +56,7 @@
 #include "buddhabox/filter/dc_blocker.h"
 #include "buddhabox/filter/hilbert.h"
 #include "buddhabox/filter/moog_filter.h"
+#include "buddhabox/filter/ms20_filter.h"
 #include "buddhabox/filter/one_pole.h"
 #include "buddhabox/filter/sv_filter.h"
 #include "buddhabox/filter/svf.h"

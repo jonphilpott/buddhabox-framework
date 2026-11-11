@@ -29,6 +29,7 @@ PinkNoise pink;
 LFSR lfsr;
 SVFilter svFilter;
 MoogFilter moog;
+Ms20Filter ms20;
 AllpassFilter<512> allpass;
 Envelope adsr;
 SlewLimiter slewLimiter;
@@ -128,7 +129,7 @@ void audioCallback(int16_t *buffer, uint16_t length) {
 
     acc += osc.process() + lfo.process() + pink.process() + lfsr.nextFloat();
     svFilter.process(in);
-    acc += svFilter.lowpass() + moog.process(in) + allpass.process(in);
+    acc += svFilter.lowpass() + moog.process(in) + ms20.process(in) + allpass.process(in);
     acc += adsr.process() + slewLimiter.process(in) + sah.process(in, true);
     acc += tempo.process() ? 1.0f : 0.0f;
     acc += lowPassGate.process(in) + waveFolder.process(in);

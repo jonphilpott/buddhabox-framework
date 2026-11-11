@@ -1172,6 +1172,44 @@ float out = filter.process(saw);</code></pre>
 <div class="method-block"><div class="method-sig">void clear()</div><div class="method-desc"><p>Reset all internal filter state to zero.</p>
 <p>Call when switching patches or presets to clear residual energy that might cause clicks or unexpected resonance artifacts.</p></div></div>
 </div>
+<h3 id="ms20-filter-h">ms20_filter.h</h3>
+<p class="include"><code>#include "buddhabox/filter/ms20_filter.h"</code> — MS-20 low-pass filter: resonance that screams but keeps the bass.</p>
+<p>The Korg MS-20&#x27;s filter (the &quot;Korg35&quot;): 12 dB per octave.</p>
+<p>WHY NOT THE MOOG LADDER? A ladder&#x27;s resonance feeds the output back to the input upside down. At the resonant peak that adds up, but at low frequencies it subtracts: turning resonance up thins the bass, down to a quarter of the level at full resonance.</p>
+<p>The MS-20 takes its feedback through a high-pass filter first. Bass never reaches the feedback path, so it passes at full level however high the resonance goes. Only the band around the cutoff is boosted. A diode clipper in the loop keeps the resonance from running away, so at high settings it growls and screams rather than whistling cleanly.</p>
+<p>HOW THIS MODEL WORKS (after Will Pirkle&#x27;s &quot;Virtual Analog Korg35&quot; application note, built on Vadim Zavalishin&#x27;s zero-delay-feedback filters):</p>
+<p>in ─► low-pass 1 ─► (+) ─► clip ─► low-pass 2 ─┬─► out ▲                         │ └── high-pass ◄── x K ◄───┘</p>
+<p>Each block is a one-pole filter. Feedback in a digital filter usually needs a one-sample delay, which detunes the cutoff and makes high resonance unstable. The &quot;zero-delay feedback&quot; (ZDF) method solves the loop&#x27;s equation for the current sample instead: alpha0_ below is that solution. The filter stays in tune and stable while the cutoff sweeps.</p>
+<h5>Cost</h5>
+<p>72 cycles a sample on the F411 (3.3% of the budget; the Moog ladder is 44), 40 bytes. setFrequency() calls tanf() and costs 233 cycles: call it at control rate, or every few samples for an envelope sweep (examples/acid does every 8th, 29 cycles a sample).</p>
+<div class="module-card" id="ms20filter">
+<h4>Ms20Filter</h4>
+<div class="method-sig">class Ms20Filter</div>
+<p>MS-20 style 2-pole low-pass filter with resonance that keeps the bass.</p>
+<p class="example-label">Example — a resonant sweep on a saw:</p>
+<pre><code>Ms20Filter filter;
+filter.setResonance(0.8f);
+
+// Every few samples (setFrequency() uses tanf()):
+filter.setFrequency(cutoffHz);
+// Every sample:
+float out = filter.process(saw.process());</code></pre>
+<p class="example-label">Instantiation</p><pre><code>Ms20Filter name;</code></pre>
+<div class="method-block"><div class="method-sig">void setFrequency(float hz)</div><div class="method-desc"><p>Set the cutoff. Uses tanf(): control rate.</p>
+<p class="example-label">Example:</p>
+<pre><code>filter.setFrequency(800.0f);</code></pre>
+<div class="method-param">Param <code>hz</code> — Cutoff in Hz, clamped to 20 Hz .. 0.45 x the sample rate. Repeating the last value costs nothing.</div></div></div>
+<div class="method-block"><div class="method-sig">void setResonance(float res)</div><div class="method-desc"><p>Set the resonance.</p>
+<p class="example-label">Example:</p>
+<pre><code>filter.setResonance(0.85f); // acid territory</code></pre>
+<div class="method-param">Param <code>res</code> — 0.0 = none, 0.7 = a strong peak, 1.0 = self-oscillation (a growling tone at the cutoff, held in check by the clipper)</div></div></div>
+<div class="method-block"><div class="method-sig">float process(float in)</div><div class="method-desc"><p>Filter one sample.</p>
+<p class="example-label">Example:</p>
+<pre><code>float out = filter.process(in);</code></pre>
+<div class="method-param">Param <code>in</code> — Input, about -1.0 to 1.0</div>
+<div class="method-returns">Returns: Low-passed output; bass keeps its level at any resonance</div></div></div>
+<div class="method-block"><div class="method-sig">void clear()</div><div class="method-desc"><p>Clear the filter&#x27;s memory (silence, no ringing).</p></div></div>
+</div>
 <h3 id="one-pole-h">one_pole.h</h3>
 <p class="include"><code>#include "buddhabox/filter/one_pole.h"</code> — Zero-delay-feedback one-pole low-pass / high-pass filter.</p>
 <p>The simplest useful filter, with a gentle 6 dB/octave slope. Low-pass smooths control signals and tames harsh highs; high-pass removes rumble. It uses the same zero-delay-feedback design as Svf, so the cutoff stays accurate up to Nyquist and can change every sample.</p>

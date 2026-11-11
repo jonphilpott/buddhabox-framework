@@ -182,6 +182,7 @@ SmoothRandom smoothRandom;
 SVFilter svFilter;
 Svf svf;
 MoogFilter moog;
+Ms20Filter ms20;
 OnePole onePoleFilter;
 DcBlocker dcBlocker;
 VowelFilter vowel;
@@ -342,6 +343,8 @@ void loop() {
   PROFILE("Svf", "filter/svf.h", sizeof(svf), acc += svf.process(in).lp);
   PROFILE("MoogFilter", "filter/moog_filter.h", sizeof(moog),
           acc += moog.process(in));
+  PROFILE("Ms20Filter", "filter/ms20_filter.h", sizeof(ms20),
+          acc += ms20.process(in));
   PROFILE("OnePole", "filter/one_pole.h", sizeof(onePoleFilter),
           acc += onePoleFilter.process(in).lp);
   PROFILE("DcBlocker", "filter/dc_blocker.h", sizeof(dcBlocker),
@@ -538,6 +541,8 @@ void loop() {
                              TanApprox::Fast));
   SETTER("MoogFilter.setFrequency", "filter/moog_filter.h",
          moog.setFrequency(1000.0f + in * 500.0f));
+  SETTER("Ms20Filter.setFrequency", "filter/ms20_filter.h",
+         ms20.setFrequency(1000.0f + in * 500.0f));
   SETTER("OnePole.setFrequency", "filter/one_pole.h",
          onePoleFilter.setFrequency(1000.0f + in * 500.0f));
   SETTER("HarmonicOscillator.setFrequency", "osc/harmonic.h",

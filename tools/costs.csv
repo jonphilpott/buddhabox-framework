@@ -22,6 +22,7 @@ SmoothRandom,noise/smooth_random.h,12.0,24,0.55
 SVFilter,filter/sv_filter.h,6.0,28,0.28
 Svf,filter/svf.h,18.0,28,0.83
 MoogFilter,filter/moog_filter.h,44.0,28,2.02
+Ms20Filter,filter/ms20_filter.h,72.0,40,3.31
 OnePole,filter/one_pole.h,13.0,16,0.60
 DcBlocker,filter/dc_blocker.h,5.0,12,0.23
 VowelFilter,filter/vowel.h,199.0,176,9.14
@@ -84,6 +85,7 @@ SVFilter.setFrequency,filter/sv_filter.h,95.0,0,4.36
 Svf.setFrequency (exact tan),filter/svf.h,170.0,0,7.81
 Svf.setCoefficients (fast tan),filter/svf.h,56.0,0,2.57
 MoogFilter.setFrequency,filter/moog_filter.h,183.0,0,8.41
+Ms20Filter.setFrequency,filter/ms20_filter.h,233.0,0,10.70
 OnePole.setFrequency,filter/one_pole.h,164.0,0,7.53
 HarmonicOscillator.setFrequency,osc/harmonic.h,40.0,0,1.84
 StringSynthOscillator.setFrequency,osc/string_synth.h,103.0,0,4.73

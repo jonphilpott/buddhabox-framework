@@ -498,6 +498,7 @@ shown; a smaller buffer saves RAM, not cycles.</p>
   <tr><td><code>SVFilter</code></td><td>6</td><td>0.3%</td><td>28 B</td></tr>
   <tr><td><code>Svf</code></td><td>18</td><td>0.8%</td><td>28 B</td></tr>
   <tr><td><code>MoogFilter</code></td><td>44</td><td>2.0%</td><td>28 B</td></tr>
+  <tr><td><code>Ms20Filter</code></td><td>72</td><td>3.3%</td><td>40 B</td></tr>
   <tr><td><code>OnePole</code></td><td>13</td><td>0.6%</td><td>16 B</td></tr>
   <tr><td><code>DcBlocker</code></td><td>5</td><td>0.2%</td><td>12 B</td></tr>
   <tr><td><code>VowelFilter</code></td><td>199</td><td>9.1%</td><td>176 B</td></tr>
@@ -568,6 +569,7 @@ shown; a smaller buffer saves RAM, not cycles.</p>
   <tr><td><code>Svf.setFrequency</code> (exact tan)</td><td>170</td><td>7.8%</td><td>&ndash;</td></tr>
   <tr><td><code>Svf.setCoefficients</code> (fast tan)</td><td>56</td><td>2.6%</td><td>&ndash;</td></tr>
   <tr><td><code>MoogFilter.setFrequency</code></td><td>183</td><td>8.4%</td><td>&ndash;</td></tr>
+  <tr><td><code>Ms20Filter.setFrequency</code></td><td>233</td><td>10.7%</td><td>&ndash;</td></tr>
   <tr><td><code>OnePole.setFrequency</code></td><td>164</td><td>7.5%</td><td>&ndash;</td></tr>
   <tr><td><code>HarmonicOscillator.setFrequency</code></td><td>40</td><td>1.8%</td><td>&ndash;</td></tr>
   <tr><td><code>StringSynthOscillator.setFrequency</code></td><td>103</td><td>4.7%</td><td>&ndash;</td></tr>
@@ -976,6 +978,26 @@ header comment says how to turn it into the Easel's quick, struck
 PA0&ndash;PA3 (timbre, FM depth, pulser rate, swell length).</p>
 <pre><code>pio run -e easel -t upload</code></pre>
 
+<h3>acid</h3>
+<p>A 303-style acid bass line. A 16-step sequence with accents, slides,
+rests and octave jumps plays a saw or square through a resonant
+filter, with a filter envelope that snaps open on every note. Its notes
+come from a <code>Colour</code> scale. The OLED shows the sequence and a
+menu: turn the encoder to pick an item, press to edit it, turn to change
+it. The items are Tempo, Cutoff, Resonance, Env Mod, Decay, Accent,
+Drive, Wave, Filter, Colour, Delay Time, Delay Mix, Feedback, Reverb
+and Randomize, which rolls a new sequence.
+Filter switches between <code>Ms20Filter</code>, whose resonance keeps
+the bass, and the Moog ladder, whose bass thins as resonance rises.
+The voice then goes through a tempo-synced echo, 3/16 by default, whose
+repeats darken as they fade, and the spring reverb. Wiring as for
+<code>oled</code>, without the knob. A kick on the beat and a snare on 2
+and 4 play underneath, dry; Drums sets their level. Both run at half
+the sample rate, which roughly halves their cost. The whole patch uses
+72% of the CPU (56% without the drums) and 89&nbsp;KB of RAM. A hi-hat
+would add another 11%, enough to make the encoder sluggish.</p>
+<pre><code>pio run -e acid -t upload</code></pre>
+
 <h3>oled</h3>
 <p>A knob on PA1 sets a tone's pitch, a rotary encoder on PB6/PB7
 transposes it in semitones, and the encoder's push switch on PB5 resets
@@ -1360,6 +1382,7 @@ these changes:</p>
 <div><a href="reference.html#dcblocker">DcBlocker</a> — Removes DC offset and sub-audio drift.</div>
 <div><a href="reference.html#hilbert">Hilbert</a> — Hilbert transformer: two outputs 90 degrees apart (Warps).</div>
 <div><a href="reference.html#moogfilter">MoogFilter</a> — 4-pole Moog ladder filter approximation with resonance.</div>
+<div><a href="reference.html#ms20filter">Ms20Filter</a> — MS-20 low-pass filter: resonance that screams but keeps the bass.</div>
 <div><a href="reference.html#onepoleout">OnePoleOut</a>, <a href="reference.html#onepole">OnePole</a> — Zero-delay-feedback one-pole low-pass / high-pass filter.</div>
 <div><a href="reference.html#svfilter">SVFilter</a> — State Variable Filter (SVF) with simultaneous low/high/bandpass</div>
 <div><a href="reference.html#svfout">SvfOut</a>, <a href="reference.html#svf">Svf</a> — Zero-delay-feedback state-variable filter (stmlib&#x27;s Svf).</div>
