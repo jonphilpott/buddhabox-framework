@@ -891,6 +891,18 @@ RandomSequence whose déjà-vu setting makes the variations loop.</p>
 <p>Not musical: instantiates every class so <code>pio run -e
 compile_all</code> proves the whole framework builds, and reports the
 combined RAM and flash.</p>
+<h3>aeolian_harp</h3>
+<p>A generative aeolian harp in D. Wind blowing past a string sheds
+vortices at a rate that rises with wind speed; when that rate nears one
+of the string's harmonics, the harmonic sings. Sixteen narrow band-pass
+filters, tuned to the harmonics of D2 (73.4 Hz) and fed white noise,
+stand in for the strings. Two <code>SmoothRandom</code>s make the wind,
+and once per block its speed sets which harmonics sing: two strings of
+different thickness each light a small group that climbs the harmonic
+series as gusts build. Pink noise adds the rush of air, and a long
+reverb the space. About half the F411's CPU; no controls.</p>
+<pre><code>pio run -e aeolian_harp -t upload</code></pre>
+
 <h3>oled</h3>
 <p>A knob on PA1 sets a tone's pitch, and a 128&times;64 OLED shows the
 pitch and the CPU load as numbers and bars. It shows the pattern for any
