@@ -3386,7 +3386,7 @@ float s = Xmod::morph(0.5f + 0.5f * lfo.process(), mod, carrier, 0.4f);</code></
 <div class="method-returns">Returns: The combined signal, about ±1</div></div></div>
 </div>
 </section>
-<section id="io"><h2>Inputs and outputs</h2><p>Pots, switches, touch, keypads, LED.</p>
+<section id="io"><h2>Inputs and outputs</h2><p>Pots, switches, encoder, touch, keypads, LED.</p>
 <h3 id="analog-input-h">analog_input.h</h3>
 <p class="include"><code>#include "buddhabox/io/analog_input.h"</code> — Smoothed analog input reader for external sensors.</p>
 <p>Reads analog voltage from an ADC pin and provides a smoothed, normalized value. Designed for connecting external sensors like:</p>
@@ -3442,6 +3442,54 @@ float freq = mapf(val, 0.0f, 1.0f, 100.0f, 2000.0f);</code></pre>
 <pre><code>// Switch to faster response when reading a knob
 sensor.setAlpha(0.2f);</code></pre>
 <div class="method-param">Param <code>a</code> — New alpha value (0.0–1.0).</div></div></div>
+</div>
+<h3 id="encoder-input-h">encoder_input.h</h3>
+<p class="include"><code>#include "buddhabox/io/encoder_input.h"</code> — One rotary encoder, counted in hardware by timer TIM4.</p>
+<p>A rotary encoder (the clicky knob that turns forever, as on a menu) has two switches, A and B, that open and close a quarter of a step apart as you turn it. The order they change in gives the direction:</p>
+<p>clockwise:      A B = 00 → 10 → 11 → 01 → 00   (one full cycle) anticlockwise:  A B = 00 → 01 → 11 → 10 → 00</p>
+<p>Each change is an &quot;edge&quot;. Most encoders make 4 edges per click (detent); some make 2.</p>
+<p>WHY A HARDWARE TIMER? ───────────────────── A brisk turn makes an edge every 2–5 ms. If you read the pins from loop() and loop() stalls for longer than that, you miss edges and can even read the direction backwards. loop() does stall: the audio interrupt takes most of each block at high CPU load, and an Oled display() takes about 27 ms.</p>
+<p>The STM32&#x27;s general-purpose timers have an &quot;encoder mode&quot; that reads A and B themselves and counts up or down on every edge. Counting costs no CPU and misses nothing however long loop() stalls; we read the count whenever convenient.</p>
+<p>WHAT ABOUT CONTACT BOUNCE? ────────────────────────── Quadrature counting largely cancels bounce by itself. While one contact bounces, the other is steady, so the count goes +1, -1, +1, -1 and settles where it should. On top of that, the timer&#x27;s digital input filter ignores glitches shorter than about 10 µs.</p>
+<p>WIRING (fixed pins): ──────────────────── Encoder A   → PB6   (TIM4 channel 1) Encoder B   → PB7   (TIM4 channel 2) Encoder C   → GND   (the middle pin of the three) Switch legs → any free pin and GND; read it with SwitchInput</p>
+<p>The internal pull-ups are turned on, so no resistors are needed. If the count runs the wrong way, swap A and B. These pins are fixed: only TIM4 reaches them, and only these pins reach TIM4 without taking analog pins. Don&#x27;t use analogWrite() on PB6/PB7 as well, since it would reprogram TIM4.</p>
+<p class="example-label">Example usage:</p>
+<pre><code>EncoderInput enc;             // 4 edges per detent
+SwitchInput  push(PB5);       // the encoder&#x27;s push switch
+
+void setup() {
+    enc.begin();
+    push.begin();
+}
+
+void loop() {
+    int turn = enc.delta();   // detents since the last call
+    if (turn != 0) menuItem += turn;
+    push.update();
+    if (push.triggered()) selectItem(menuItem);
+}</code></pre>
+<div class="module-card" id="encoderinput">
+<h4>EncoderInput</h4>
+<div class="method-sig">class EncoderInput</div>
+<p>One rotary encoder on PB6/PB7, counted by timer TIM4.</p>
+<p>See the file header above for how it works and how to wire it.</p>
+<p class="example-label">Example:</p>
+<pre><code>EncoderInput enc;        // in setup(): enc.begin();
+int turn = enc.delta();  // in loop(): +1 per click clockwise</code></pre>
+<p class="example-label">Instantiation</p><pre><code>EncoderInput nameoderInput(uint8_t edgesPerDetent = 4);</code></pre>
+<div class="method-block"><div class="method-sig">explicit EncoderInput(uint8_t edgesPerDetent = 4)</div><div class="method-desc"><p>Construct an EncoderInput. Nothing touches the hardware until begin().</p>
+<p class="example-label">Example:</p>
+<pre><code>EncoderInput enc;      // 4 edges per click
+EncoderInput enc2(2);  // half-step encoder</code></pre>
+<div class="method-param">Param <code>edgesPerDetent</code> — Edges the encoder makes per click: 4 for most (e.g. EC11, PEC11), 2 for some. If one click moves two steps, double this; if two clicks move one step, halve it. 0 is treated as 1.</div></div></div>
+<div class="method-block"><div class="method-sig">void begin()</div><div class="method-desc"><p>Set up PB6/PB7 and start TIM4 counting. Call once in setup().</p>
+<p class="example-label">Example:</p>
+<pre><code>void setup() { enc.begin(); }</code></pre></div></div>
+<div class="method-block"><div class="method-sig">int delta()</div><div class="method-desc"><p>Clicks turned since the last call: positive for clockwise, negative for anticlockwise, 0 if the knob hasn&#x27;t moved.</p>
+<p>Call it from one place only (normally loop()), because each call consumes the movement. Edges short of a whole click are kept for next time, so slow turns aren&#x27;t lost. It only reads a register, so it is also safe from the audio callback.</p>
+<p class="example-label">Example:</p>
+<pre><code>volume = constrain(volume + enc.delta(), 0, 10);</code></pre>
+<div class="method-returns">Returns: Signed number of clicks since the previous call.</div></div></div>
 </div>
 <h3 id="led-h">led.h</h3>
 <p class="include"><code>#include "buddhabox/io/led.h"</code> — Driver for the onboard user LED (PC13) on the Black Pill.</p>

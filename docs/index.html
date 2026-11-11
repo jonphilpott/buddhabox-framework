@@ -244,7 +244,7 @@ F411 boards share this pinout.</p>
   <tr><td>PA8, PA15</td><td>2</td><td>No</td><td>Yes</td><td></td></tr>
   <tr><td>PA9, PA10</td><td>2</td><td>No</td><td>Yes</td><td>Serial port 1 (TX, RX) if you need one</td></tr>
   <tr><td>PB3, PB4, PB5</td><td>3</td><td>No</td><td>Yes</td><td></td></tr>
-  <tr><td>PB6, PB7</td><td>2</td><td>No</td><td>Yes</td><td>I2C1 (SCL, SDA), the default mapping</td></tr>
+  <tr><td>PB6, PB7</td><td>2</td><td>No</td><td>Yes</td><td>I2C1 (SCL, SDA), the default mapping; the only pins for a rotary encoder</td></tr>
   <tr><td>PB8, PB9</td><td>2</td><td>No</td><td>Yes</td><td>I2C1 (SCL, SDA), the mapping the MPR121 driver uses</td></tr>
   <tr><td>PB10, PB14</td><td>2</td><td>No</td><td>Yes</td><td></td></tr>
 </table>
@@ -265,6 +265,20 @@ noise. The ADC is 12-bit (0&ndash;4095) and reads 0&ndash;3.3 V.</p>
 <p>Wire a push button or toggle between any free pin and GND.
 <code>SwitchInput</code> turns on the chip's internal pull-up resistor
 and removes contact bounce, so no other parts are needed.</p>
+
+<h4>Wiring a rotary encoder</h4>
+<p>One rotary encoder, such as an EC11 with a push switch, works with
+<code>EncoderInput</code> and needs no other parts: A to PB6, B to PB7,
+the middle pin C to GND. Wire the push switch between any free pin and
+GND and read it with <code>SwitchInput</code>. Call <code>begin()</code>
+in <code>setup()</code>, then <code>delta()</code> in <code>loop()</code>
+returns the clicks turned since the last call (positive clockwise). If
+it counts backwards, swap A and B.</p>
+<p>The pins are fixed because timer TIM4 does the counting. Reading the
+pins from <code>loop()</code> would miss steps whenever
+<code>loop()</code> stalls, as it does for 27 ms during an OLED
+update; the timer counts every edge regardless, at no CPU cost. Don't
+use <code>analogWrite()</code> on PB6 or PB7 alongside it.</p>
 
 <div class="note"><strong>3.3 V only.</strong> Never connect a pot or
 sensor powered from 5 V to an analog pin: the pins read 0&ndash;3.3 V, and
@@ -1328,6 +1342,7 @@ these changes:</p>
 </div>
 <h3>Inputs and outputs</h3><div class="catalogue">
 <div><a href="reference.html#analoginput">AnalogInput</a> — Smoothed analog input reader for external sensors.</div>
+<div><a href="reference.html#encoderinput">EncoderInput</a> — One rotary encoder, counted in hardware by timer TIM4.</div>
 <div><a href="reference.html#userled">UserLED</a> — Driver for the onboard user LED (PC13) on the Black Pill.</div>
 <div><a href="reference.html#matrixkeypad">MatrixKeypad</a> — 5×5 diode matrix keypad — debounced input with per-key</div>
 <div><a href="reference.html#mpr121input">MPR121Input</a> — MPR121 capacitive touch controller — standalone I2C driver</div>

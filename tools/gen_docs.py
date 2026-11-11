@@ -42,7 +42,8 @@ CATEGORIES = [
     ('physical', 'Physical models', 'Strings, resonators, tubes.'),
     ('drums', 'Drums', 'Analog and digital drum voices.'),
     ('spectral', 'Spectral', 'FM and cross-modulation.'),
-    ('io', 'Inputs and outputs', 'Pots, switches, touch, keypads, LED.'),
+    ('io', 'Inputs and outputs',
+     'Pots, switches, encoder, touch, keypads, LED.'),
 ]
 
 

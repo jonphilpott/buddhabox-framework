@@ -22,6 +22,7 @@
 
 // ── io ──
 #include "buddhabox/io/analog_input.h"
+#include "buddhabox/io/encoder_input.h"
 #include "buddhabox/io/led.h"
 #include "buddhabox/io/matrix_keypad.h"
 #include "buddhabox/io/mpr121_input.h"
