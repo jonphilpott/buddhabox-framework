@@ -53,7 +53,7 @@ build_flags =
     -O2
     -D PIO_FRAMEWORK_ARDUINO_ENABLE_CDC
     -D USBCON
-;   -D ADC_SAMPLINGTIME=ADC_SAMPLETIME_480CYCLES  ; for 100k pots
+;   -D ADC_SAMPLINGTIME=ADC_SAMPLETIME_480CYCLES  ; slow ADC: > 100k sources
 ;   -D BB_OVERRUN_LED=0   ; frees the blue LED (PC13) from the CPU overrun
 ;                         ; indicator, e.g. to use UserLED
 lib_deps =

@@ -109,6 +109,12 @@ public:
    * reading (no gradual ramp-up from zero).
    */
   void update() {
+    // The Arduino core reads 10 bits (0-1023) unless told otherwise,
+    // for compatibility with the old Arduino Uno. The STM32's ADC is
+    // 12-bit, and every scaling here assumes 0-4095, so ask for all 12
+    // each time: it only sets a variable, and nothing else can then
+    // change it behind our back.
+    analogReadResolution(12);
     raw_ = analogRead(pin_);
 
     // 1. Smooth.
@@ -160,7 +166,10 @@ public:
    * tweaked based on actual read values
    */
   float readLDR() const {
-    float r = 1 - (read() * 5);
+    // Tuned when update() read 10 bits, so read() then topped out at
+    // 0.25; the 1.25 (5 x 0.25) keeps the curve as it was now that it
+    // reads all 12.
+    float r = 1 - (read() * 1.25f);
 
     float adj = r < 0.0f ? 0.0f : (r * 2.75f);
     adj = adj > 1.0f ? 1.0f : adj;

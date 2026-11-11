@@ -307,6 +307,12 @@ private:
     if (settlingUs_ > 0)
       delayMicroseconds(settlingUs_);
 
+    // The Arduino core reads 10 bits (0-1023) unless told otherwise,
+    // for compatibility with the old Arduino Uno. The STM32's ADC is
+    // 12-bit, and every scaling here assumes 0-4095, so ask for all 12
+    // each time: it only sets a variable, and nothing else can then
+    // change it behind our back.
+    analogReadResolution(12);
     uint16_t raw = (uint16_t)analogRead(sigPin_);
 
     // Check the initialization bitmask. Bit N corresponds to channel N.

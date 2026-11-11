@@ -48,7 +48,7 @@
  * 16-step melody over two octaves, plus random accents, slides, rests
  * and octave jumps. Changing Colour keeps the melody and re-tunes it.
  *
- * THE MENU (encoder):
+ * THE MENU (encoder; Menu in io/menu.h does the work):
  *   turn          move between items
  *   press         start editing the item (its value shows as <value>)
  *   turn          change the value; press again to finish
@@ -59,6 +59,9 @@
  *   OLED     VCC -> 3V3, GND -> GND, SCL -> PB8, SDA -> PB9
  *   Encoder  A -> PB6, B -> PB7, C (middle pin) -> GND
  *   Push     one leg -> PB5, the other -> GND
+ *   Knob     (optional) pot: outer legs to 3V3 and GND, wiper to PA1.
+ *            Sets the cutoff; set kCutoffKnob = false without one, or
+ *            the unconnected pin's noise will move the filter.
  *
  * Cost: 72% of the F411's CPU, measured on the board: 56% without the
  * drums (the spring alone is about 21%). 89 KB of RAM, 64 KB of it the
@@ -77,7 +80,9 @@
 #include "buddhabox/fx/delay.h"
 #include "buddhabox/fx/overdrive.h"
 #include "buddhabox/fx/spring_reverb.h"
+#include "buddhabox/io/analog_input.h"
 #include "buddhabox/io/encoder_input.h"
+#include "buddhabox/io/menu.h"
 #include "buddhabox/io/oled.h"
 #include "buddhabox/io/switch_input.h"
 #include "buddhabox/mod/clock.h"
@@ -91,12 +96,12 @@ using namespace bb;
 const float kRoot = 55.0f;         // A1: the bottom note of the sequence
 const int kSteps = 16;             // one bar of sixteenth notes
 const float kGlideSeconds = 0.06f; // a 303 slide takes about 60 ms
+const bool kCutoffKnob = true;     // a pot on PA1 sets the cutoff
 const int kFilterEvery = 8;        // samples between cutoff updates (see below)
 
 // ── The menu ─────────────────────────────────────────────────────────
-// Every item is a whole number with a range and a step; the voice reads
-// them through applyMenu(). Integers keep the menu code simple: the
-// encoder adds or subtracts steps, and nothing drifts.
+// Menu (io/menu.h) does the scrolling, editing and drawing; this file
+// only lists the items. The voice reads their values in applyMenu().
 enum Item {
   TEMPO,
   CUTOFF,
@@ -117,22 +122,29 @@ enum Item {
   kItems
 };
 
-struct MenuItem {
-  const char *name;
-  int value, min, max, step;
-};
+const char *const kWaves[] = {"Saw", "Square"};
+const char *const kFilters[] = {"Ladder", "MS-20"};
 
-MenuItem menu[kItems] = {
-    {"Tempo", 125, 60, 200, 1},   {"Cutoff", 30, 0, 100, 2},
-    {"Resonance", 75, 0, 100, 2}, {"Env Mod", 60, 0, 100, 2},
-    {"Decay", 40, 0, 100, 2},     {"Accent", 60, 0, 100, 2},
-    {"Drive", 30, 0, 100, 2},     {"Wave", 0, 0, 1, 1},
-    {"Filter", 1, 0, 1, 1},       {"Colour", 6, 0, 15, 1},
-    {"Delay Time", 3, 1, 6, 1}, // in sixteenths: 3 = dotted eighth
-    {"Delay Mix", 30, 0, 100, 2}, {"Feedback", 45, 0, 90, 2},
-    {"Reverb", 25, 0, 100, 2},    {"Drums", 70, 0, 100, 2},
-    {"Randomize", 0, 0, 0, 0},
+MenuItem items[kItems] = {
+    {"Tempo", 125, 60, 200, 1},
+    {"Cutoff", 30, 0, 100, 2},
+    {"Resonance", 75, 0, 100, 2},
+    {"Env Mod", 60, 0, 100, 2},
+    {"Decay", 40, 0, 100, 2},
+    {"Accent", 60, 0, 100, 2},
+    {"Drive", 30, 0, 100, 2},
+    {"Wave", 0, 0, 1, 1, kWaves},
+    {"Filter", 1, 0, 1, 1, kFilters},
+    {"Colour", 6, 0, 15, 1},
+    {"Delay Time", 3, 1, 6, 1, nullptr,
+     "/16"}, // in sixteenths: 3 = dotted eighth
+    {"Delay Mix", 30, 0, 100, 2},
+    {"Feedback", 45, 0, 90, 2},
+    {"Reverb", 25, 0, 100, 2},
+    {"Drums", 70, 0, 100, 2},
+    {"Randomize"}, // step 0: an action
 };
+Menu menu(items, kItems);
 
 // ── Modules ──────────────────────────────────────────────────────────
 BasicOscillator osc;
@@ -158,6 +170,7 @@ Colour colour;
 LFSR rng(303);
 
 EncoderInput encoder;
+AnalogInput cutoffKnob(PA1, 0.3f); // quick: it's for wiggling
 SwitchInput push(PB5);
 Oled oled;
 bool haveScreen = false;
@@ -214,33 +227,33 @@ void randomize() {
  * after any change; uses library maths, so control rate only.
  */
 void applyMenu() {
-  tempo.setBPM((float)menu[TEMPO].value);
+  tempo.setBPM((float)items[TEMPO].value);
   // Cutoff: 40 Hz to about 2.6 kHz over the knob (six octaves), before
   // the envelope adds its sweep on top.
-  cutoffSemis = 0.72f * menu[CUTOFF].value;
+  cutoffSemis = 0.72f * items[CUTOFF].value;
   // Env Mod: up to four more octaves at the envelope's peak.
-  envModSemis = 0.48f * menu[ENV_MOD].value;
+  envModSemis = 0.48f * items[ENV_MOD].value;
   // Resonance stops short of 1.0, where both filters ring on their own.
-  resonance = 0.0096f * menu[RESONANCE].value;
+  resonance = 0.0096f * items[RESONANCE].value;
   ladder.setResonance(resonance);
   ms20.setResonance(resonance);
-  useMs20 = menu[FILTER].value;
+  useMs20 = items[FILTER].value;
   // Decay: 0.1 to 2 seconds, squared so the short, snappy settings get
   // more of the range.
-  float d = menu[DECAY].value / 100.0f;
+  float d = items[DECAY].value / 100.0f;
   filterEnv.setRelease(0.1f + 1.9f * d * d);
-  accentAmount = menu[ACCENT].value / 100.0f;
-  drive.setDrive(menu[DRIVE].value / 100.0f);
-  osc.setShape(menu[WAVE].value ? BasicOscillator::SQUARE
-                                : BasicOscillator::SAW);
-  colour.setColour(COLOUR_BY_BRIGHTNESS[menu[COLOUR].value]);
+  accentAmount = items[ACCENT].value / 100.0f;
+  drive.setDrive(items[DRIVE].value / 100.0f);
+  osc.setShape(items[WAVE].value ? BasicOscillator::SQUARE
+                                 : BasicOscillator::SAW);
+  colour.setColour(COLOUR_BY_BRIGHTNESS[items[COLOUR].value]);
   // Echo: a number of sixteenth notes at the current tempo.
-  float sixteenth = SAMPLE_RATE * 60.0f / (menu[TEMPO].value * 4.0f);
-  echoSamples = minf(sixteenth * menu[DELAY_TIME].value, 32766.0f);
-  echoMix = menu[DELAY_MIX].value / 100.0f;
-  echoFeedback = menu[FEEDBACK].value / 100.0f;
-  spring.setAmount(menu[REVERB].value / 100.0f);
-  drumLevel = menu[DRUMS].value / 100.0f;
+  float sixteenth = SAMPLE_RATE * 60.0f / (items[TEMPO].value * 4.0f);
+  echoSamples = minf(sixteenth * items[DELAY_TIME].value, 32766.0f);
+  echoMix = items[DELAY_MIX].value / 100.0f;
+  echoFeedback = items[FEEDBACK].value / 100.0f;
+  spring.setAmount(items[REVERB].value / 100.0f);
+  drumLevel = items[DRUMS].value / 100.0f;
 }
 
 /**
@@ -367,11 +380,11 @@ void audioCallback(int16_t *buffer, uint16_t length) {
  * Draw one frame. The yellow top band (rows 0-15 on two-colour panels)
  * holds the title and the sequence; the blue rest holds the menu.
  */
-void drawScreen(int selected, bool editing) {
+void drawScreen() {
   // 1. Title bar: name and tempo, dark on lit.
   oled.rect(0, 0, 128, 8, true);
   int x = oled.text(2, 0, "ACID  ", false);
-  x = oled.number(x, 0, (float)menu[TEMPO].value, 0, false);
+  x = oled.number(x, 0, (float)items[TEMPO].value, 0, false);
   oled.text(x, 0, " bpm ", false);
 
   // 2. The sequence: a filled box per accented note, an outline per
@@ -390,35 +403,8 @@ void drawScreen(int selected, bool editing) {
       oled.rect(cx + 1, 15, 6, 1, true);
   }
 
-  // 3. The menu: six rows, scrolled to keep the selection in view.
-  const int kRows = 6;
-  int first = selected - kRows + 1;
-  first = first < 0 ? 0 : first;
-  for (int r = 0; r < kRows; r++) {
-    int item = first + r;
-    int y = 16 + r * 8;
-    bool on = item != selected; // the selected row is drawn inverted
-    oled.rect(0, y, 128, 8, true, !on);
-    if (item >= kItems)
-      continue;
-    oled.text(2, y, menu[item].name, on);
-    if (item == RANDOMIZE)
-      continue;
-    x = 80;
-    if (editing && item == selected)
-      x = oled.text(x - 6, y, "<", on);
-    if (item == WAVE)
-      x = oled.text(x, y, menu[item].value ? "Square" : "Saw", on);
-    else if (item == FILTER)
-      x = oled.text(x, y, menu[item].value ? "MS-20" : "Ladder", on);
-    else if (item == DELAY_TIME) {
-      x = oled.number(x, y, (float)menu[item].value, 0, on);
-      x = oled.text(x, y, "/16", on);
-    } else
-      x = oled.number(x, y, (float)menu[item].value, 0, on);
-    if (editing && item == selected)
-      oled.text(x, y, ">", on);
-  }
+  // 3. The menu: six rows under the yellow band.
+  menu.draw(oled, 16, 6);
 }
 
 void setup() {
@@ -452,31 +438,30 @@ void setup() {
 }
 
 void loop() {
-  static int selected = 0;
-  static bool editing = false;
-
-  // 1. Encoder: moves the selection, or changes the value being edited.
-  push.update();
-  int turn = encoder.delta();
-  if (turn != 0) {
-    if (editing) {
-      MenuItem &m = menu[selected];
-      int v = m.value + turn * m.step;
-      m.value = v < m.min ? m.min : (v > m.max ? m.max : v);
+  // 1. Cutoff knob. Only a real move gets through its hysteresis, and
+  //    then it takes over from the menu: the Cutoff item is set to
+  //    match, so the screen shows where the knob is. The cutoff itself
+  //    comes straight from the knob's reading, finer than the menu's
+  //    whole-number steps, so a slow turn sweeps smoothly.
+  if (kCutoffKnob) {
+    static float lastKnob = -1.0f;
+    cutoffKnob.update();
+    float k = cutoffKnob.read();
+    if (k != lastKnob) {
+      lastKnob = k;
+      items[CUTOFF].value = (int)(k * 100.0f + 0.5f);
       applyMenu();
-    } else {
-      int s = selected + turn;
-      selected = s < 0 ? 0 : (s >= kItems ? kItems - 1 : s);
+      cutoffSemis = 72.0f * k;
     }
   }
 
-  // 2. Push: Randomize acts at once; any other item toggles editing.
-  if (push.triggered()) {
-    if (selected == RANDOMIZE)
-      randomize();
-    else
-      editing = !editing;
-  }
+  // 2. Menu: hand it the encoder and the switch; it says what changed.
+  push.update();
+  Menu::Event event = menu.update(encoder.delta(), push.triggered());
+  if (event == Menu::CHANGED)
+    applyMenu();
+  else if (event == Menu::ACTION && menu.selected() == RANDOMIZE)
+    randomize();
 
   // 3. CPU load over USB serial once a second (pio device monitor).
   static uint32_t lastPrint = 0;
@@ -491,7 +476,7 @@ void loop() {
   static uint32_t lastFrame = 0;
   if (haveScreen && millis() - lastFrame >= 50) {
     lastFrame = millis();
-    drawScreen(selected, editing);
+    drawScreen();
     oled.display();
   }
 }

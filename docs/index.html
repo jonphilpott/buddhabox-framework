@@ -92,13 +92,16 @@ python3 tools/new_project.py ../bells --example custom_voice
 cd ../my_synth &amp;&amp; pio run</code></pre>
 <p>Each project has its own <code>platformio.ini</code>, so one board can
 upload with an ST-Link and another with DFU without touching the
-framework. For example, <code>analogRead()</code> gives the ADC only 15
-clocks to sample by default: enough for 10k pots, not for 100k ones,
-which read low near mid-travel and bleed into the next pot. A project
-using 100k pots can uncomment
-<code>-D ADC_SAMPLINGTIME=ADC_SAMPLETIME_480CYCLES</code> in its
-<code>build_flags</code>, or put a 100&nbsp;nF capacitor from each wiper
-to ground.</p>
+framework. For example, <code>analogRead()</code> gives the ADC 15
+clocks to sample by default. That is plenty for 10k and 100k pots: a
+B100k pot at mid-travel, its worst case, read only 0.07% (3 counts)
+lower than with 480 clocks, and showed no carry-over from the channel
+read before it. Both are hidden by <code>AnalogInput</code>'s
+hysteresis. Sources with a higher resistance, such as a light-dependent
+resistor in a divider, may need more time: uncomment
+<code>-D ADC_SAMPLINGTIME=ADC_SAMPLETIME_480CYCLES</code> in that
+project's <code>build_flags</code>, or put a 100&nbsp;nF capacitor from
+the pin to ground.</p>
 <p>To add the framework to an existing PlatformIO project instead, point <code>lib_deps</code> at this repository. A <code>symlink://</code>
 path uses your local checkout directly, so edits to the framework show up
 immediately:</p>
@@ -368,6 +371,37 @@ lines. I2C is slow, about 27 ms for a whole screen, so
 from <code>loop()</code> 10 to 20 times a second, never from the audio
 callback. Audio is unaffected while it sends; <code>loop()</code>
 waits.</p>
+
+<h4>A settings menu</h4>
+<p>With an OLED and a rotary encoder, <code>Menu</code>
+(<code>io/menu.h</code>) gives a project a scrolling list of settings.
+Turn to move the highlight, press to edit an item, turn to change it,
+press again to finish. List the items as an array of
+<code>MenuItem</code>s: a name, a value, a range and a step. Add words
+to show instead of numbers, or a suffix such as <code>"/16"</code>. An
+item with only a name is an action, such as Randomize.</p>
+<pre><code>enum { CUTOFF, WAVE, RANDOMIZE, kItems };
+const char *const waves[] = {"Saw", "Square"};
+MenuItem items[kItems] = {
+    {"Cutoff", 50, 0, 100, 2},    // name, value, min, max, step
+    {"Wave", 0, 0, 1, 1, waves},  // shown as Saw or Square
+    {"Randomize"},                // an action
+};
+Menu menu(items, kItems);
+
+void loop() {
+  push.update();
+  Menu::Event e = menu.update(encoder.delta(), push.triggered());
+  if (e == Menu::CHANGED)
+    applySettings();              // reads items[CUTOFF].value etc.
+  if (e == Menu::ACTION &amp;&amp; menu.selected() == RANDOMIZE)
+    randomize();
+  menu.draw(oled, 16, 6);         // six rows from y = 16
+  oled.display();
+}</code></pre>
+<p><code>Menu</code> reads no pins itself, so it works with any input.
+Redraw it on a <code>millis()</code> timer like any other drawing. The
+<code>acid</code> example uses one with 16 items.</p>
 
 <h3>Signal path</h3>
 <div class="flow">
@@ -991,7 +1025,9 @@ Filter switches between <code>Ms20Filter</code>, whose resonance keeps
 the bass, and the Moog ladder, whose bass thins as resonance rises.
 The voice then goes through a tempo-synced echo, 3/16 by default, whose
 repeats darken as they fade, and the spring reverb. Wiring as for
-<code>oled</code>, without the knob. A kick on the beat and a snare on 2
+<code>oled</code>; the optional pot on PA1 sets the cutoff (set
+<code>kCutoffKnob</code> to <code>false</code> without one). A kick on
+the beat and a snare on 2
 and 4 play underneath, dry; Drums sets their level. Both run at half
 the sample rate, which roughly halves their cost. The whole patch uses
 72% of the CPU (56% without the drums) and 89&nbsp;KB of RAM. A hi-hat
@@ -1458,6 +1494,7 @@ these changes:</p>
 <div><a href="reference.html#encoderinput">EncoderInput</a> — One rotary encoder, counted in hardware by timer TIM4.</div>
 <div><a href="reference.html#userled">UserLED</a> — Driver for the onboard user LED (PC13) on the Black Pill.</div>
 <div><a href="reference.html#matrixkeypad">MatrixKeypad</a> — 5×5 diode matrix keypad — debounced input with per-key</div>
+<div><a href="reference.html#menuitem">MenuItem</a>, <a href="reference.html#menu">Menu</a> — A scrolling settings menu on an Oled, driven by an encoder.</div>
 <div><a href="reference.html#mpr121input">MPR121Input</a> — MPR121 capacitive touch controller — standalone I2C driver</div>
 <div><a href="reference.html#muxinput">MuxInput</a> — CD74HC4067 16-channel analog multiplexer driver.</div>
 <div><a href="reference.html#oled">Oled</a> — Driver for 128x64 monochrome I2C OLED displays (SSD1306, SH1106).</div>

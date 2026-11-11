@@ -3809,6 +3809,74 @@ float out  = osc.process() * env.process() * gate;</code></pre>
 <div class="method-param">Param <code>key</code> — Key index 0–24.</div>
 <div class="method-returns">Returns: true if the key is currently held.</div></div></div>
 </div>
+<h3 id="menu-h">menu.h</h3>
+<p class="include"><code>#include "buddhabox/io/menu.h"</code> — A scrolling settings menu on an Oled, driven by an encoder.</p>
+<p>Most small instruments end up with the same menu: a list of named values, a highlighted row, and an encoder to change things. This is that menu, so a project only has to list its settings.</p>
+<h5>How It Is Played</h5>
+<p>turn    move the highlight up and down the list press   start editing the highlighted item: its value shows as &lt;value&gt;, and turning now changes it; press again to finish press on an action item (such as &quot;Randomize&quot;): do it at once</p>
+<h5>How The Code Fits Together</h5>
+<p>Menu does no reading of pins itself. Your loop() reads the encoder and the switch and hands the result to update(), which says what happened. That keeps Menu usable with any input: an EncoderInput, two buttons, MIDI, or a test.</p>
+<p>Every value is a whole number with a range and a step. Integers keep the maths simple (the encoder adds or subtracts steps, so nothing drifts); your code turns them into Hz, seconds or whatever it needs.</p>
+<p class="example-label">Example usage:</p>
+<pre><code>enum { CUTOFF, WAVE, RANDOMIZE, kItems };   // item numbers
+const char *const waves[] = {&quot;Saw&quot;, &quot;Square&quot;};
+MenuItem items[kItems] = {
+    {&quot;Cutoff&quot;, 50, 0, 100, 2},             // name, value, min, max, step
+    {&quot;Wave&quot;, 0, 0, 1, 1, waves},           // shown as Saw / Square
+    {&quot;Randomize&quot;},                         // step 0: an action
+};
+Menu menu(items, kItems);
+
+void loop() {
+    push.update();
+    Menu::Event e = menu.update(encoder.delta(), push.triggered());
+    if (e == Menu::CHANGED)
+        applySettings();       // reads items[CUTOFF].value etc.
+    if (e == Menu::ACTION &amp;&amp; menu.selected() == RANDOMIZE)
+        randomize();
+    menu.draw(oled, 16, 6);    // six rows from y = 16
+    oled.display();
+}</code></pre>
+<div class="module-card" id="menuitem">
+<h4>MenuItem</h4>
+<div class="method-sig">struct MenuItem</div>
+<p>One line of a Menu. Fill it in with braces; fields left out are zero, which is what makes <code>{&quot;Randomize&quot;}</code> an action.</p>
+<ul><li>name:   shown on the left</li><li>value:  the current setting; read it in your code</li><li>min, max, step: the range, and how much one encoder click changes it</li><li>labels: optional words to show instead of the number, one per value from min to max (labels[value - min])</li><li>suffix: optional text after the number, such as &quot; Hz&quot; or &quot;/16&quot;</li></ul>
+<p>An item with step 0 is an action: pressing on it makes update() return Menu::ACTION instead of starting an edit, and no value shows.</p>
+<p class="example-label">Example:</p>
+<pre><code>MenuItem tempo = {&quot;Tempo&quot;, 120, 60, 200, 1, nullptr, &quot; bpm&quot;};</code></pre>
+<p class="example-label">Instantiation</p><pre><code>MenuItem name;</code></pre>
+</div>
+<div class="module-card" id="menu">
+<h4>Menu</h4>
+<div class="method-sig">class Menu</div>
+<p>A scrolling list of MenuItems, edited with an encoder and drawn on an Oled. Holds a pointer to your array, so your code reads values straight from it.</p>
+<p class="example-label">Example:</p>
+<pre><code>MenuItem items[] = {{&quot;Level&quot;, 70, 0, 100, 2}, {&quot;Reset&quot;}};
+Menu menu(items, 2);</code></pre>
+<p class="example-label">Instantiation</p><pre><code>Menu name(MenuItem *items, int count);</code></pre>
+<div class="method-block"><div class="method-sig">enum Event</div><div class="method-desc"><p>What update() reports.</p></div></div>
+<div class="method-block"><div class="method-sig">Menu(MenuItem *items, int count)</div><div class="method-desc"><p class="example-label">Example:</p>
+<pre><code>Menu menu(items, sizeof(items) / sizeof(items[0]));</code></pre>
+<div class="method-param">Param <code>items</code> — Your array of items. Menu keeps the pointer, so the array must outlive it (a global is simplest).</div>
+<div class="method-param">Param <code>count</code> — How many items are in it</div></div></div>
+<div class="method-block"><div class="method-sig">Event update(int turn, bool pressed)</div><div class="method-desc"><p>Apply one round of input. Call it every loop().</p>
+<p class="example-label">Example:</p>
+<pre><code>if (menu.update(encoder.delta(), push.triggered()) == Menu::CHANGED)
+  applySettings();</code></pre>
+<div class="method-param">Param <code>turn</code> — Encoder clicks since last time (EncoderInput::delta()): positive moves down the list or raises the value</div>
+<div class="method-param">Param <code>pressed</code> — true on the loop() the switch was pressed (SwitchInput::triggered())</div>
+<div class="method-returns">Returns: CHANGED if a value changed, ACTION if an action item was pressed (selected() says which item), otherwise NONE</div></div></div>
+<div class="method-block"><div class="method-sig">int selected() const</div><div class="method-desc"><div class="method-returns">Returns: The highlighted item&#x27;s index</div></div></div>
+<div class="method-block"><div class="method-sig">bool editing() const</div><div class="method-desc"><div class="method-returns">Returns: true while the highlighted item is being edited</div></div></div>
+<div class="method-block"><div class="method-sig">void draw(Oled &amp;oled, int y, int rows, int valueX = 80) const</div><div class="method-desc"><p>Draw the menu: one row of 8 pixels per item, the highlighted row inverted, scrolled so the highlight is always in view. Call oled.display() afterwards, as for any drawing.</p>
+<p class="example-label">Example:</p>
+<pre><code>menu.draw(oled, 16, 6); // below a 16-pixel header</code></pre>
+<div class="method-param">Param <code>oled</code> — The display</div>
+<div class="method-param">Param <code>y</code> — Top of the first row, in pixels</div>
+<div class="method-param">Param <code>rows</code> — How many rows to draw; (64 - y) / 8 fills the rest of the screen</div>
+<div class="method-param">Param <code>valueX</code> — Where values start, in pixels from the left; names longer than about valueX / 6 characters run into them</div></div></div>
+</div>
 <h3 id="mpr121-input-h">mpr121_input.h</h3>
 <p class="include"><code>#include "buddhabox/io/mpr121_input.h"</code> — MPR121 capacitive touch controller — standalone I2C driver</p>
 <p>with per-electrode trigger/hold/release detection.</p>

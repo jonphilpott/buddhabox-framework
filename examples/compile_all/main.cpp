@@ -43,6 +43,11 @@ AnalogInput pot(PA0);
 SwitchInput button(PB3);
 UserLED led;
 Oled oled;
+const char *const menuLabels[] = {"Off", "On"};
+MenuItem menuItems[] = {{"Level", 50, 0, 100, 2, nullptr, "%"},
+                        {"Mode", 0, 0, 1, 1, menuLabels},
+                        {"Reset"}};
+Menu menu(menuItems, 3);
 
 // ── Oscillators ─────────────────────────────────────────────────────────
 SineOscillator sine;
@@ -129,7 +134,8 @@ void audioCallback(int16_t *buffer, uint16_t length) {
 
     acc += osc.process() + lfo.process() + pink.process() + lfsr.nextFloat();
     svFilter.process(in);
-    acc += svFilter.lowpass() + moog.process(in) + ms20.process(in) + allpass.process(in);
+    acc += svFilter.lowpass() + moog.process(in) + ms20.process(in) +
+           allpass.process(in);
     acc += adsr.process() + slewLimiter.process(in) + sah.process(in, true);
     acc += tempo.process() ? 1.0f : 0.0f;
     acc += lowPassGate.process(in) + waveFolder.process(in);
@@ -195,5 +201,8 @@ void loop() {
   oled.rect(0, 0, 128, 8, true);
   oled.number(oled.text(0, 16, "x "), 16, pot.read(), 2);
   oled.line(0, 63, 127, 32);
+  if (menu.update(1, button.triggered()) == Menu::ACTION)
+    menuItems[0].value = 50;
+  menu.draw(oled, 16, 6);
   oled.display();
 }

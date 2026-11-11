@@ -25,6 +25,7 @@
 #include "buddhabox/io/encoder_input.h"
 #include "buddhabox/io/led.h"
 #include "buddhabox/io/matrix_keypad.h"
+#include "buddhabox/io/menu.h"
 #include "buddhabox/io/mpr121_input.h"
 #include "buddhabox/io/mux_input.h"
 #include "buddhabox/io/oled.h"
