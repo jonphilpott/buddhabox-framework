@@ -27,6 +27,24 @@
  *
  * Think of alpha as "how much do I trust the latest reading vs the history?"
  *
+ * WHY HYSTERESIS AS WELL:
+ * ──────────────────────
+ * Smoothing shrinks the jitter but never removes it: a knob left alone
+ * still wanders by a count or two. That's inaudible on a filter cutoff,
+ * but a knob snapped to steps (notes, waveforms) flickers between two
+ * of them whenever it sits near a boundary.
+ *
+ * So the output only moves once the smoothed reading has pulled more
+ * than a small "dead band" away from it, and then it follows the reading
+ * at that distance, like a slack rope pulled by a hand:
+ *
+ *   reading > output + band  →  output = reading - band
+ *   reading < output - band  →  output = reading + band
+ *
+ * Turning the knob moves the output smoothly (just lagging by the band);
+ * leaving it alone leaves the output perfectly still. The output is
+ * rescaled so it still reaches exactly 0.0 and 1.0 at the ends.
+ *
  * IMPORTANT — DO NOT CALL FROM AUDIO ISR:
  * analogRead() is slow (~10-40 microseconds) and blocks. Call update() from
  * loop() instead. The smoothed value will be available for the audio callback
@@ -77,7 +95,8 @@ public:
    *   AnalogInput knob(PA1, 0.15f);     // Faster response for a pot
    */
   AnalogInput(uint8_t pin, float alpha = 0.05f)
-      : pin_(pin), alpha_(alpha), smoothed_(0.0f), initialized_(false) {}
+      : pin_(pin), raw_(0), alpha_(alpha), smoothed_(0.0f), band_(kDefaultBand),
+        held_(0.0f), initialized_(false) {}
 
   /**
    * Read the ADC and update the smoothed value.
@@ -92,9 +111,11 @@ public:
   void update() {
     raw_ = analogRead(pin_);
 
+    // 1. Smooth.
     if (!initialized_) {
       // First reading: initialize directly to avoid a slow ramp from 0
       smoothed_ = (float)raw_;
+      held_ = smoothed_;
       initialized_ = true;
     } else {
       // Exponential Moving Average (EMA):
@@ -106,10 +127,18 @@ public:
       // tracking, large = fast.
       smoothed_ += alpha_ * ((float)raw_ - smoothed_);
     }
+
+    // 2. Hysteresis: drag the held value only when the reading pulls
+    //    further than the band away from it.
+    if (smoothed_ > held_ + band_)
+      held_ = smoothed_ - band_;
+    else if (smoothed_ < held_ - band_)
+      held_ = smoothed_ + band_;
   }
 
   /**
-   * Get the smoothed value normalized to 0.0–1.0.
+   * Get the smoothed value, after hysteresis, normalized to 0.0–1.0.
+   * It stays perfectly still while the knob is left alone.
    *
    * Safe to call from the audio callback (ISR context).
    *
@@ -120,9 +149,11 @@ public:
    *   float freq = mapf(val, 0.0f, 1.0f, 100.0f, 2000.0f);
    */
   float read() const {
-    // STM32F4 ADC is 12-bit, so raw values range 0–4095.
-    // Dividing by 4095 maps this to 0.0–1.0.
-    return smoothed_ / 4095.0f;
+    // STM32F4 ADC is 12-bit, so raw values range 0–4095. The held value
+    // can only get within `band` of either end (the rope stays slack by
+    // that much), so stretch band..4095-band out to 0.0..1.0.
+    float x = (held_ - band_) / (4095.0f - 2.0f * band_);
+    return x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x);
   }
 
   /*
@@ -141,6 +172,7 @@ public:
    *
    * Useful when you need integer precision or want to do your own
    * scaling math.
+   * Before hysteresis: it still wanders by a count or so.
    *
    * @return  Smoothed ADC value truncated to uint16_t
    */
@@ -164,11 +196,30 @@ public:
    */
   void setAlpha(float a) { alpha_ = a; }
 
+  /**
+   * Set the dead band: how far the reading must move before read()
+   * follows it. Wider = steadier, but a little less resolution.
+   *
+   * @param counts  Band in ADC counts (of 4095). Default 8 (0.2%):
+   *                enough to stop a smoothed pot flickering. 0 turns
+   *                hysteresis off; try 16-32 for long wires or a noisy
+   *                supply.
+   *
+   * Example:
+   *   AnalogInput steps(PA2, 0.3f);
+   *   steps.setHysteresis(24.0f); // 8 steps that never flicker
+   */
+  void setHysteresis(float counts) { band_ = counts < 0.0f ? 0.0f : counts; }
+
 private:
+  static constexpr float kDefaultBand = 8.0f; // ADC counts
+
   uint8_t pin_;      // ADC pin number
   uint16_t raw_;     // last raw value
   float alpha_;      // EMA smoothing coefficient
   float smoothed_;   // Current smoothed value (in raw ADC units, 0-4095)
+  float band_;       // Hysteresis dead band, in ADC counts
+  float held_;       // Output after hysteresis (ADC counts)
   bool initialized_; // Whether we've taken the first reading yet
 };
 

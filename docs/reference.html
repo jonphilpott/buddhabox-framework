@@ -3511,6 +3511,11 @@ float s = Xmod::morph(0.5f + 0.5f * lfo.process(), mod, carrier, 0.4f);</code></
 <p>We use an Exponential Moving Average (EMA) filter to smooth the readings: smoothed = smoothed + alpha * (raw - smoothed)</p>
 <p>The alpha parameter controls the tradeoff: alpha = 0.01 → Very smooth, but slow to respond (good for light sensors) alpha = 0.05 → Default: balanced smoothing (good for most sensors) alpha = 0.3  → Responsive but less smooth (good for knobs/pots) alpha = 1.0  → No smoothing (raw readings)</p>
 <p>Think of alpha as &quot;how much do I trust the latest reading vs the history?&quot;</p>
+<h5>Why Hysteresis As Well</h5>
+<p>────────────────────── Smoothing shrinks the jitter but never removes it: a knob left alone still wanders by a count or two. That&#x27;s inaudible on a filter cutoff, but a knob snapped to steps (notes, waveforms) flickers between two of them whenever it sits near a boundary.</p>
+<p>So the output only moves once the smoothed reading has pulled more than a small &quot;dead band&quot; away from it, and then it follows the reading at that distance, like a slack rope pulled by a hand:</p>
+<p>reading &gt; output + band  →  output = reading - band reading &lt; output - band  →  output = reading + band</p>
+<p>Turning the knob moves the output smoothly (just lagging by the band); leaving it alone leaves the output perfectly still. The output is rescaled so it still reaches exactly 0.0 and 1.0 at the ends.</p>
 <p>IMPORTANT — DO NOT CALL FROM AUDIO ISR: analogRead() is slow (~10-40 microseconds) and blocks. Call update() from loop() instead. The smoothed value will be available for the audio callback to read via read() — this is safe because float reads are atomic on ARM.</p>
 <p class="example-label">Example usage:</p>
 <pre><code>AnalogInput lightSensor(PA0, 0.03f);  // Slow smoothing for light
@@ -3541,14 +3546,14 @@ AnalogInput knob(PA1, 0.15f);     // Faster response for a pot</code></pre>
 <div class="method-block"><div class="method-sig">void update()</div><div class="method-desc"><p>Read the ADC and update the smoothed value.</p>
 <p>Call this from loop() at a regular interval (every 5–20 ms is fine). Do NOT call from the audio callback — analogRead() is too slow and would cause audio glitches.</p>
 <p>On the first call, the smoothed value is initialized to the current reading (no gradual ramp-up from zero).</p></div></div>
-<div class="method-block"><div class="method-sig">float read() const</div><div class="method-desc"><p>Get the smoothed value normalized to 0.0–1.0.</p>
+<div class="method-block"><div class="method-sig">float read() const</div><div class="method-desc"><p>Get the smoothed value, after hysteresis, normalized to 0.0–1.0. It stays perfectly still while the knob is left alone.</p>
 <p>Safe to call from the audio callback (ISR context).</p>
 <p class="example-label">Example:</p>
 <pre><code>float val = sensor.read();
 float freq = mapf(val, 0.0f, 1.0f, 100.0f, 2000.0f);</code></pre>
 <div class="method-returns">Returns: Normalized sensor value. 0.0 = 0V, 1.0 = 3.3V (full scale).</div></div></div>
 <div class="method-block"><div class="method-sig">uint16_t readRaw() const</div><div class="method-desc"><p>Get the smoothed value as a raw 12-bit integer (0–4095).</p>
-<p>Useful when you need integer precision or want to do your own scaling math.</p>
+<p>Useful when you need integer precision or want to do your own scaling math. Before hysteresis: it still wanders by a count or so.</p>
 <div class="method-returns">Returns: Smoothed ADC value truncated to uint16_t</div></div></div>
 <div class="method-block"><div class="method-sig">uint16_t readReallyRaw() const</div><div class="method-desc"><p>get the last actual read value from the ADC</p>
 <div class="method-returns">Returns: really raw adc val</div></div></div>
@@ -3557,6 +3562,11 @@ float freq = mapf(val, 0.0f, 1.0f, 100.0f, 2000.0f);</code></pre>
 <pre><code>// Switch to faster response when reading a knob
 sensor.setAlpha(0.2f);</code></pre>
 <div class="method-param">Param <code>a</code> — New alpha value (0.0–1.0).</div></div></div>
+<div class="method-block"><div class="method-sig">void setHysteresis(float counts)</div><div class="method-desc"><p>Set the dead band: how far the reading must move before read() follows it. Wider = steadier, but a little less resolution.</p>
+<p class="example-label">Example:</p>
+<pre><code>AnalogInput steps(PA2, 0.3f);
+steps.setHysteresis(24.0f); // 8 steps that never flicker</code></pre>
+<div class="method-param">Param <code>counts</code> — Band in ADC counts (of 4095). Default 8 (0.2%): enough to stop a smoothed pot flickering. 0 turns hysteresis off; try 16-32 for long wires or a noisy supply.</div></div></div>
 </div>
 <h3 id="encoder-input-h">encoder_input.h</h3>
 <p class="include"><code>#include "buddhabox/io/encoder_input.h"</code> — One rotary encoder, counted in hardware by timer TIM4.</p>

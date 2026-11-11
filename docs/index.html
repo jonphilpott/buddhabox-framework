@@ -304,6 +304,12 @@ with <code>-D BB_OVERRUN_LED=0</code>).</p>
 GND, the middle leg (wiper) to an analog pin. Read it with
 <code>AnalogInput</code>, which gives 0.0 to 1.0 and smooths out ADC
 noise. The ADC is 12-bit (0&ndash;4095) and reads 0&ndash;3.3 V.</p>
+<p>Smoothing alone leaves a resting knob wandering by a count or two,
+enough to flicker between two notes when the knob is snapped to steps.
+So <code>AnalogInput</code> also has hysteresis: its output stays still
+until the reading moves more than 8 counts, then follows it. Widen the
+band with <code>setHysteresis(24)</code> for long wires or a noisy
+supply, or turn it off with <code>setHysteresis(0)</code>.</p>
 
 <h4>Wiring a switch</h4>
 <p>Wire a push button or toggle between any free pin and GND.
@@ -971,8 +977,10 @@ PA0&ndash;PA3 (timbre, FM depth, pulser rate, swell length).</p>
 <pre><code>pio run -e easel -t upload</code></pre>
 
 <h3>oled</h3>
-<p>A knob on PA1 sets a tone's pitch, and a 128&times;64 OLED shows the
-pitch and the CPU load as numbers and bars. It shows the pattern for any
+<p>A knob on PA1 sets a tone's pitch, a rotary encoder on PB6/PB7
+transposes it in semitones, and the encoder's push switch on PB5 resets
+the transpose. A 128&times;64 OLED shows the pitch, the transpose, the
+switch and the CPU load. It shows the pattern for any
 display: read the controls and redraw on a <code>millis()</code> timer in
 <code>loop()</code>. The tone plays with no display attached.</p>
 <pre><code>pio run -e oled -t upload</code></pre>
