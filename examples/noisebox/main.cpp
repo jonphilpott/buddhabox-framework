@@ -36,6 +36,7 @@
  * - Space: the spring.
  *
  * THE MENU (encoder; turn, press to edit, press to finish) also holds:
+ * - Volume: the main level, applied after everything else.
  * - Pitch: chromatic, C1 to C6 (32.7 Hz to 1 kHz), shown as a note
  *   name; the sequence plays on top of it, in the Colour's scale.
  * - Colour: that scale, one of 16 five-note scales from dark to bright.
@@ -117,9 +118,10 @@ const bool kKnobs = true; // pots on PA1-PA7 and PB0 (see Wiring)
 const int kMaxSteps = 8;  // the longest sequence
 
 // ── The menu ─────────────────────────────────────────────────────────
-// Pitch and Colour first, since they're changed most from the menu;
-// then the eight pot items, in panel order; then the menu-only rest.
+// Volume, Pitch and Colour first, since they're changed most from the
+// menu; then the eight pot items, in panel order; then the rest.
 enum Item {
+  VOLUME,
   PITCH,
   COLOUR,
   NOISE,
@@ -161,6 +163,7 @@ const char *const kFolds[] = {"Sine", "Analog"};
 const char *const kGates[] = {"Drone", "Ping"};
 
 MenuItem items[kItems] = {
+    {"Volume", 70, 0, 100, 2},
     {"Pitch", NOTE_C3, kLowNote, kHighNote, 1, noteNames},
     {"Colour", 6, 0, 15, 1},
     {"Noise", 0, 0, 10, 2},
@@ -209,7 +212,7 @@ AnalogInput knobs[] = {AnalogInput(PA1, 0.7f), AnalogInput(PA2, 0.7f),
                        AnalogInput(PA5, 0.7f), AnalogInput(PA6, 0.7f),
                        AnalogInput(PA7, 0.7f), AnalogInput(PB0, 0.7f)};
 const int kKnobCount = sizeof(knobs) / sizeof(knobs[0]);
-const Item kKnobItems[kKnobCount] = {NOISE, TIMBRE, FM,     MOD_RATE,
+const Item kKnobItems[kKnobCount] = {NOISE, TIMBRE, FM,       MOD_RATE,
                                      RATE,  DECAY,  ECHO_MIX, SPACE};
 
 // ── Modules ──────────────────────────────────────────────────────────
@@ -245,6 +248,7 @@ bool haveScreen = false;
 // ── Settings for the audio interrupt, from applyMenu() ──────────────
 // loop() writes these and the audio interrupt reads them. A float is
 // written in one instruction, so the interrupt never sees half of one.
+float volume = 0.5f;      // Volume, as a gain
 float baseHz = 100.0f;    // Pitch
 float timbre = 0.3f;      // Timbre
 float fmDepth = 0.2f;     // FM
@@ -287,6 +291,11 @@ void randomize() {
 void applyMenu() {
   // 1. The panel. Exponential where the ear hears ratios (pitch, rates),
   //    linear where it hears amounts.
+  // Volume, squared: the ear hears level roughly on a log scale, and
+  // a square is close enough that the bottom half of the range isn't
+  // all "nearly full". 70 is about -6 dB.
+  float v = position(VOLUME);
+  volume = 30000.0f * v * v;
   // Pitch (menu only): a whole note, so it always lands on a semitone.
   baseHz = midiToFreq((uint8_t)items[PITCH].value); // powf: control rate
   noiseAmount = position(NOISE);
@@ -431,8 +440,10 @@ void audioCallback(int16_t *buffer, uint16_t length) {
     //    scale. The spring spreads the mono voice into stereo.
     float left = x + space * (wetL - x);
     float right = x + space * (wetR - x);
-    buffer[i] = (int16_t)(softLimitClip(left) * 30000.0f);
-    buffer[i + 1] = (int16_t)(softLimitClip(right) * 30000.0f);
+    //    Volume comes after the limit, so turning it down only makes
+    //    it quieter, never cleaner or dirtier.
+    buffer[i] = (int16_t)(softLimitClip(left) * volume);
+    buffer[i + 1] = (int16_t)(softLimitClip(right) * volume);
   }
 }
 
