@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BuddhaBox Easel Patcher</title>
+<!--
+  Patch presets for examples/easel_matrix. Drag cables from an output
+  jack (filled) to a slider's input jack (hollow), set the sliders and
+  switches, choose what each pot moves, then save presets.json into
+  examples/easel_matrix/ and run
+      python3 tools/gen_presets.py examples/easel_matrix/presets.json
+
+  One file, no build step and no libraries, in the black-and-white
+  style of editor.html. Works opened straight from disk.
+
+  HOW THE CODE IS ORGANISED:
+  1. The instrument: items, sources and panel sections. These mirror
+     main.cpp; gen_presets.py checks the names against it, and the
+     board clamps any value out of range.
+  2. State: the presets, which one is open, the selected cable.
+  3. Layout: where every section, slider and jack sits.
+  4. Drawing: the whole SVG is rebuilt after every change.
+  5. Pointer handling: drag sliders, draw cables.
+  6. Side panel: the selected cable, the pots, the preset's name.
+  7. Files: open, save, autosave.
+-->
+<style>
+  :root {
+    --paper: #ffffff;
+    --ink: #111111;
+    --ink-2: #555555;
+    --ink-3: #9a9a9a;
+    --line: #e2e2e2;
+    --wash: #f7f7f5;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font: 13px/1.45 var(--sans);
+    display: grid;
+    grid-template-rows: auto 1fr;
+    grid-template-columns: 1fr 280px;
+    grid-template-areas: "top top" "panel side";
+    overflow: hidden;
+  }
+  header {
+    grid-area: top;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--ink);
+  }
+  h1 {
+    font: 400 19px/1 var(--serif);
+    letter-spacing: 0.04em;
+    margin: 0 12px 0 0;
+    white-space: nowrap;
+  }
+  h1 small { color: var(--ink-3); font-size: 15px; }
+  button, .button {
+    font: inherit;
+    background: var(--paper);
+    color: var(--ink);
+    border: 1px solid var(--ink);
+    border-radius: 999px;
+    padding: 4px 12px;
+    cursor: pointer;
+  }
+  button:hover, .button:hover { background: var(--ink); color: var(--paper); }
+  button.quiet { border-color: var(--line); }
+  .spacer { flex: 1; }
+  select, input {
+    font: inherit;
+    color: var(--ink);
+    background: var(--paper);
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 3px 0;
+    outline: none;
+  }
+  select:focus, input:focus { border-bottom-color: var(--ink); }
+  header select { min-width: 140px; }
+
+  #panel { grid-area: panel; overflow: auto; background: var(--wash); }
+  svg { display: block; touch-action: none; user-select: none; }
+  #side {
+    grid-area: side;
+    overflow-y: auto;
+    padding: 14px;
+    border-left: 1px solid var(--line);
+  }
+  h2 { font: 400 15px var(--serif); margin: 0 0 8px; }
+  h3 {
+    font: 600 10px var(--sans);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 18px 0 6px;
+  }
+  .field { margin: 8px 0; }
+  .field label { display: block; font-size: 11px; color: var(--ink-2); }
+  .field input, .field select { width: 100%; }
+  .pots { display: grid; grid-template-columns: 40px 1fr; gap: 4px 8px;
+          align-items: center; }
+  .pots span { font: 11px var(--mono); }
+  p.note { color: var(--ink-2); font-size: 12px; margin: 6px 0; }
+  code { font: 12px var(--mono); }
+  #status { font-size: 11px; color: var(--ink-2); }
+
+  /* SVG panel */
+  .section-box { fill: var(--paper); stroke: var(--ink); }
+  .section-title { font: 600 11px var(--sans); letter-spacing: 0.14em; }
+  .label { font: 11px var(--sans); fill: var(--ink); }
+  .value { font: 10px var(--mono); fill: var(--ink-2); }
+  .track { stroke: var(--ink-3); stroke-width: 2; }
+  .handle { fill: var(--ink); cursor: ns-resize; }
+  .hit { fill: transparent; cursor: ns-resize; }
+  .switch { fill: var(--paper); stroke: var(--ink); cursor: pointer; }
+  .switch-text { font: 11px var(--sans); pointer-events: none; }
+  .jack-in { fill: var(--paper); stroke: var(--ink); stroke-width: 2;
+             cursor: crosshair; }
+  .jack-out { fill: var(--ink); cursor: crosshair; }
+  .jack-in.hot, .jack-out.hot { stroke: var(--ink); stroke-width: 4; }
+  .pot-tag { fill: var(--ink); }
+  .pot-text { font: 600 9px var(--mono); fill: var(--paper); }
+  .cable { fill: none; stroke: var(--ink); stroke-width: 3.5;
+           stroke-linecap: round; opacity: 0.8; cursor: pointer; }
+  .cable.minus { stroke-dasharray: 7 6; }
+  .cable.selected { stroke-width: 6; opacity: 1; }
+  .cable-hit { fill: none; stroke: transparent; stroke-width: 14;
+               cursor: pointer; }
+  .plug { fill: var(--ink); }
+  .amount { font: 600 10px var(--mono); fill: var(--ink); }
+  .amount-bg { fill: var(--paper); }
+</style>
+</head>
+<body>
+<header>
+  <h1>BuddhaBox <small>Easel patcher</small></h1>
+  <select id="preset" title="The preset being edited"></select>
+  <button class="quiet" id="new">New</button>
+  <button class="quiet" id="copy">Duplicate</button>
+  <button class="quiet" id="delete">Delete</button>
+  <span class="spacer"></span>
+  <span id="status"></span>
+  <label class="button">Open<input type="file" id="open" accept=".json"
+         hidden></label>
+  <button id="save">Save presets.json</button>
+</header>
+
+<div id="panel"><svg id="svg"></svg></div>
+
+<aside id="side">
+  <h2>Preset</h2>
+  <div class="field">
+    <label for="name">Name (20 characters on the OLED)</label>
+    <input id="name" maxlength="20">
+  </div>
+
+  <h3>Cable</h3>
+  <div id="cable"></div>
+
+  <h3>Pots</h3>
+  <div class="pots" id="pots"></div>
+
+  <h3>How to</h3>
+  <p class="note">Drag from a filled jack (an output) to a hollow one
+  under a slider. The cable adds <em>amount &times; output</em> to the
+  slider; dashed cables subtract. Click a cable to set its amount or
+  remove it. Shift-click a switch to step it backwards.</p>
+  <p class="note">The sequencer only plays a tune when SEQ is patched to
+  Pitch at 100%. MOD into FM or Timbre runs at audio rate; everything
+  else updates 689 times a second.</p>
+  <p class="note">Save into <code>examples/easel_matrix/</code>, then
+  run <code>python3 tools/gen_presets.py
+  examples/easel_matrix/presets.json</code> and flash
+  <code>-e easel_matrix</code>.</p>
+</aside>
+
+<script>
+"use strict";
+
+// ── 1. The instrument (mirrors examples/easel_matrix/main.cpp) ───────
+const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A",
+                    "A#", "B"];
+const ITEMS = {
+  PITCH: {name: "Pitch", def: 48, min: 24, max: 84,
+          show: v => NOTE_NAMES[v % 12] + (Math.floor(v / 12) - 1)},
+  COLOUR: {name: "Colour", def: 6, min: 0, max: 15},
+  NOISE: {name: "Noise", def: 0, min: 0, max: 100},
+  TIMBRE: {name: "Timbre", def: 30, min: 0, max: 100},
+  FM: {name: "FM", def: 20, min: 0, max: 100},
+  MOD_RATE: {name: "Mod Rate", def: 50, min: 0, max: 100},
+  RATE: {name: "Rate", def: 50, min: 0, max: 100},
+  ATTACK: {name: "Attack", def: 0, min: 0, max: 100},
+  DECAY: {name: "Decay", def: 40, min: 0, max: 100},
+  MUTATE: {name: "Mutate", def: 20, min: 0, max: 100},
+  SPACE: {name: "Space", def: 30, min: 0, max: 100},
+  LEVEL_A: {name: "Level A", def: 70, min: 0, max: 100},
+  LEVEL_B: {name: "Level B", def: 0, min: 0, max: 100},
+  CHAOS_RATE: {name: "Chaos Rate", def: 40, min: 0, max: 100},
+  CRUSH: {name: "Crush", def: 0, min: 0, max: 100},
+  ECHO_TIME: {name: "Echo Time", def: 25, min: 1, max: 37,
+              show: v => v * 10 + "ms"},
+  ECHO_MIX: {name: "Echo Mix", def: 0, min: 0, max: 100},
+  FEEDBACK: {name: "Feedback", def: 40, min: 0, max: 95},
+  // Switches: set by a preset, never patched.
+  MOD_WAVE: {name: "Wave", def: 0, min: 0, max: 3, switch: true,
+             labels: ["Triangle", "Saw", "Square", "Noise"]},
+  MOD_TRACK: {name: "Track", def: 1, min: 0, max: 1, switch: true,
+              labels: ["Free", "Ratio"]},
+  FOLD: {name: "Fold", def: 0, min: 0, max: 1, switch: true,
+         labels: ["Sine", "Analog"]},
+  GATE_A: {name: "Gate A", def: 1, min: 0, max: 1, switch: true,
+           labels: ["Level", "Ping"]},
+  GATE_B: {name: "Gate B", def: 0, min: 0, max: 1, switch: true,
+           labels: ["Level", "Env"]},
+  STEPS: {name: "Steps", def: 5, min: 1, max: 8, switch: true},
+};
+const PATCHABLE = Object.keys(ITEMS).filter(k => !ITEMS[k].switch);
+const SOURCES = {
+  PULSER: "a falling ramp, 1 at each pulse down to 0",
+  ENV: "the envelope, struck on every pulse",
+  SEQ: "the sequencer's note: to Pitch at 100% plays in tune",
+  RANDOM: "a new random value on every pulse, -1 to 1",
+  MOD: "the mod oscillator, -1 to 1",
+  CHAOS: "a Lorenz attractor, about -1 to 1",
+};
+const POTS = ["PA1", "PA2", "PA3", "PA4", "PA5", "PA6", "PA7", "PB0"];
+const MAX_CABLES = 16;
+const SECTIONS = [
+  {title: "PULSER", sliders: ["RATE"], outs: ["PULSER"]},
+  {title: "ENVELOPE", sliders: ["ATTACK", "DECAY"], outs: ["ENV"]},
+  {title: "SEQUENCER", sliders: ["MUTATE", "COLOUR"], switches: ["STEPS"],
+   outs: ["SEQ"]},
+  {title: "RANDOM", outs: ["RANDOM"]},
+  {title: "CHAOS", sliders: ["CHAOS_RATE"], outs: ["CHAOS"]},
+  {title: "MOD OSC", sliders: ["MOD_RATE"],
+   switches: ["MOD_WAVE", "MOD_TRACK"], outs: ["MOD"], br: true},
+  {title: "COMPLEX OSC", sliders: ["PITCH", "NOISE", "TIMBRE", "FM"],
+   switches: ["FOLD"]},
+  {title: "GATES", sliders: ["LEVEL_A", "LEVEL_B"],
+   switches: ["GATE_A", "GATE_B"]},
+  {title: "EFFECTS",
+   sliders: ["CRUSH", "ECHO_TIME", "ECHO_MIX", "FEEDBACK", "SPACE"]},
+];
+
+// ── 2. State ─────────────────────────────────────────────────────────
+function newPreset(name) {
+  const settings = {};
+  for (const k in ITEMS) settings[k] = ITEMS[k].def;
+  return {
+    name: name,
+    settings: settings,
+    cables: [{from: "SEQ", to: "PITCH", amount: 1.0}],
+    knobs: ["NOISE", "TIMBRE", "FM", "MOD_RATE", "RATE", "DECAY",
+            "MUTATE", "SPACE"],
+  };
+}
+
+let presets = [newPreset("Init")];
+let current = 0;
+let selected = -1; // index of the selected cable, or -1
+let drag = null;   // a slider or cable being dragged
+const preset = () => presets[current];
+
+/** Fill in anything a loaded preset leaves out, so drawing is simple. */
+function complete(p) {
+  const full = newPreset(p.name || "Untitled");
+  Object.assign(full.settings, p.settings || {});
+  full.cables = (p.cables || []).filter(
+      c => SOURCES[c.from] !== undefined && PATCHABLE.includes(c.to));
+  if (Array.isArray(p.knobs) && p.knobs.length === POTS.length)
+    full.knobs = p.knobs.slice();
+  return full;
+}
+
+// ── 3. Layout ────────────────────────────────────────────────────────
+const S = {pad: 16, slider: 56, switchW: 96, outW: 64, gap: 14,
+           height: 250, top: 34, track: 120, wrap: 1240};
+const layout = {sections: [], jacksIn: {}, jacksOut: {}, sliders: {},
+                switches: {}, width: 0, height: 0};
+
+function computeLayout() {
+  let x = S.gap, y = S.gap;
+  layout.sections = [];
+  for (const sec of SECTIONS) {
+    const nSl = (sec.sliders || []).length;
+    const w = S.pad * 2 + nSl * S.slider +
+              (sec.switches ? S.switchW : 0) + (sec.outs ? S.outW : 0);
+    if (sec.br || x + w > S.wrap) { x = S.gap; y += S.height + S.gap; }
+    const box = {sec, x, y, w};
+    layout.sections.push(box);
+
+    // Sliders: a vertical track, label and value under it, and the
+    // input jack at the bottom.
+    let cx = x + S.pad + S.slider / 2;
+    for (const item of sec.sliders || []) {
+      const top = y + S.top + 18, bottom = top + S.track;
+      layout.sliders[item] = {cx, top, bottom};
+      layout.jacksIn[item] = {x: cx, y: bottom + 50};
+      cx += S.slider;
+    }
+    // Switches: stacked boxes.
+    let sy = y + S.top + 18;
+    const sx = x + S.pad + nSl * S.slider;
+    for (const item of sec.switches || []) {
+      layout.switches[item] = {x: sx, y: sy, w: S.switchW - 12, h: 26};
+      sy += 50;
+    }
+    // Outputs: filled jacks down the right-hand edge.
+    let oy = y + S.top + 50;
+    for (const src of sec.outs || []) {
+      layout.jacksOut[src] = {x: x + w - S.pad - 18, y: oy};
+      oy += 60;
+    }
+    x += w + S.gap;
+  }
+  layout.width = S.wrap + S.gap;
+  layout.height = y + S.height + S.gap;
+}
+
+// ── 4. Drawing ───────────────────────────────────────────────────────
+const svg = document.getElementById("svg");
+const NS = "http://www.w3.org/2000/svg";
+
+function el(name, attrs, parent, text) {
+  const e = document.createElementNS(NS, name);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text !== undefined) e.textContent = text;
+  (parent || svg).appendChild(e);
+  return e;
+}
+
+function show(item) {
+  const spec = ITEMS[item], v = preset().settings[item];
+  if (spec.labels) return spec.labels[v - spec.min];
+  return spec.show ? spec.show(v) : String(v);
+}
+
+/** A patch cable's path: a curve that sags under its own weight. */
+function cablePath(a, b) {
+  const sag = 40 + Math.hypot(b.x - a.x, b.y - a.y) * 0.25;
+  return "M" + a.x + "," + a.y + " C" + a.x + "," + (a.y + sag) + " " +
+         b.x + "," + (b.y + sag) + " " + b.x + "," + b.y;
+}
+
+function draw() {
+  svg.textContent = "";
+  svg.setAttribute("viewBox", "0 0 " + layout.width + " " + layout.height);
+  svg.setAttribute("width", layout.width);
+  svg.setAttribute("height", layout.height);
+  const p = preset();
+
+  // 1. Sections, sliders, switches and jacks.
+  for (const box of layout.sections) {
+    el("rect", {class: "section-box", x: box.x, y: box.y, width: box.w,
+                height: S.height});
+    el("text", {class: "section-title", x: box.x + S.pad, y: box.y + 22},
+       null, box.sec.title);
+  }
+  for (const item in layout.sliders) {
+    const s = layout.sliders[item], spec = ITEMS[item];
+    const t = (p.settings[item] - spec.min) / (spec.max - spec.min);
+    const hy = s.bottom - t * (s.bottom - s.top);
+    el("line", {class: "track", x1: s.cx, y1: s.top, x2: s.cx,
+                y2: s.bottom});
+    el("rect", {class: "handle", x: s.cx - 10, y: hy - 4, width: 20,
+                height: 8, rx: 2});
+    el("rect", {class: "hit", x: s.cx - 22, y: s.top - 8, width: 44,
+                height: s.bottom - s.top + 16, "data-slider": item});
+    el("text", {class: "label", x: s.cx, y: s.bottom + 18,
+                "text-anchor": "middle"}, null, spec.name);
+    el("text", {class: "value", x: s.cx, y: s.bottom + 31,
+                "text-anchor": "middle"}, null, show(item));
+    const pot = p.knobs.indexOf(item);
+    if (pot >= 0) {
+      el("rect", {class: "pot-tag", x: s.cx - 15, y: s.top - 20,
+                  width: 30, height: 12, rx: 6});
+      el("text", {class: "pot-text", x: s.cx, y: s.top - 11,
+                  "text-anchor": "middle"}, null, POTS[pot]);
+    }
+  }
+  for (const item in layout.switches) {
+    const s = layout.switches[item];
+    el("text", {class: "label", x: s.x, y: s.y - 4}, null,
+       ITEMS[item].name);
+    el("rect", {class: "switch", x: s.x, y: s.y, width: s.w, height: s.h,
+                rx: 13, "data-switch": item});
+    el("text", {class: "switch-text", x: s.x + s.w / 2, y: s.y + 17,
+                "text-anchor": "middle"}, null, show(item));
+  }
+  for (const item in layout.jacksIn) {
+    const j = layout.jacksIn[item];
+    const c = el("circle", {class: "jack-in", cx: j.x, cy: j.y, r: 8,
+                            "data-in": item});
+    el("title", {}, c, ITEMS[item].name + " in");
+  }
+  for (const src in layout.jacksOut) {
+    const j = layout.jacksOut[src];
+    const c = el("circle", {class: "jack-out", cx: j.x, cy: j.y, r: 10,
+                            "data-out": src});
+    el("title", {}, c, src + ": " + SOURCES[src]);
+    el("text", {class: "label", x: j.x, y: j.y + 26,
+                "text-anchor": "middle"}, null, src);
+  }
+
+  // 2. Cables, over everything: a wide invisible stroke to click, the
+  //    cable, a plug at each end and its amount at the middle.
+  p.cables.forEach((c, i) => {
+    const a = layout.jacksOut[c.from], b = layout.jacksIn[c.to];
+    const d = cablePath(a, b);
+    let cls = "cable" + (c.amount < 0 ? " minus" : "") +
+              (i === selected ? " selected" : "");
+    el("path", {class: cls, d: d});
+    el("path", {class: "cable-hit", d: d, "data-cable": i});
+    el("circle", {class: "plug", cx: a.x, cy: a.y, r: 5});
+    el("circle", {class: "plug", cx: b.x, cy: b.y, r: 5});
+    // The curve's middle: a cubic Bezier at t = 0.5 is
+    // (P0 + 3 P1 + 3 P2 + P3) / 8, which here puts it halfway across
+    // and three quarters of the sag down.
+    const sag = 40 + Math.hypot(b.x - a.x, b.y - a.y) * 0.25;
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 + 0.75 * sag + 4;
+    const label = Math.round(c.amount * 100) + "%";
+    el("rect", {class: "amount-bg", x: mx - 18, y: my - 9, width: 36,
+                height: 13, rx: 3, "data-cable": i});
+    el("text", {class: "amount", x: mx, y: my, "text-anchor": "middle",
+                "data-cable": i}, null, label);
+  });
+
+  // 3. Invisible copies of the jacks, on top: a cable lying across a
+  //    jack would otherwise catch the click and the drop.
+  for (const item in layout.jacksIn) {
+    const j = layout.jacksIn[item];
+    el("circle", {cx: j.x, cy: j.y, r: 10, fill: "transparent",
+                  cursor: "crosshair", "data-in": item});
+  }
+  for (const src in layout.jacksOut) {
+    const j = layout.jacksOut[src];
+    el("circle", {cx: j.x, cy: j.y, r: 12, fill: "transparent",
+                  cursor: "crosshair", "data-out": src});
+  }
+
+  // 4. A cable being drawn follows the pointer.
+  if (drag && drag.kind === "cable" && drag.at) {
+    const start = drag.from ? layout.jacksOut[drag.from]
+                            : layout.jacksIn[drag.to];
+    const a = drag.from ? start : drag.at, b = drag.from ? drag.at : start;
+    el("path", {class: "cable", d: cablePath(a, b),
+                "pointer-events": "none"});
+  }
+  document.getElementById("status").textContent =
+      p.cables.length + " / " + MAX_CABLES + " cables";
+}
+
+// ── 5. Pointer handling ──────────────────────────────────────────────
+function svgPoint(e) {
+  const pt = svg.createSVGPoint();
+  pt.x = e.clientX;
+  pt.y = e.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+function setSlider(item, e) {
+  const s = layout.sliders[item], spec = ITEMS[item];
+  const t = (s.bottom - svgPoint(e).y) / (s.bottom - s.top);
+  const v = spec.min + Math.round(Math.min(1, Math.max(0, t)) *
+                                  (spec.max - spec.min));
+  if (v !== preset().settings[item]) {
+    preset().settings[item] = v;
+    changed();
+  }
+}
+
+svg.addEventListener("pointerdown", e => {
+  const t = e.target.dataset;
+  if (t.slider) {
+    drag = {kind: "slider", item: t.slider};
+    setSlider(t.slider, e);
+  } else if (t.switch) {
+    const spec = ITEMS[t.switch], s = preset().settings;
+    const span = spec.max - spec.min + 1;
+    const step = e.shiftKey ? span - 1 : 1;
+    s[t.switch] = spec.min + (s[t.switch] - spec.min + step) % span;
+    changed();
+    return;
+  } else if (t.out || t.in) {
+    drag = {kind: "cable", from: t.out, to: t.in, at: svgPoint(e)};
+  } else if (t.cable !== undefined) {
+    selected = Number(t.cable);
+    refresh();
+    return;
+  } else {
+    selected = -1;
+    refresh();
+    return;
+  }
+  svg.setPointerCapture(e.pointerId);
+});
+
+svg.addEventListener("pointermove", e => {
+  if (!drag) return;
+  if (drag.kind === "slider") setSlider(drag.item, e);
+  else { drag.at = svgPoint(e); draw(); }
+});
+
+svg.addEventListener("pointerup", e => {
+  if (drag && drag.kind === "cable") {
+    // The jack under the pointer: capture sends events to the svg, so
+    // look it up by position.
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const d = hit && hit.dataset ? hit.dataset : {};
+    const from = drag.from || d.out, to = drag.to || d.in;
+    if (from && to) addCable(from, to);
+  }
+  drag = null;
+  draw();
+});
+
+function addCable(from, to) {
+  const cables = preset().cables;
+  const old = cables.findIndex(c => c.from === from && c.to === to);
+  if (old >= 0) { selected = old; refresh(); return; }
+  if (cables.length >= MAX_CABLES) {
+    alert("A preset holds at most " + MAX_CABLES + " cables.");
+    return;
+  }
+  cables.push({from, to, amount: from === "SEQ" && to === "PITCH" ? 1 : 0.5});
+  selected = cables.length - 1;
+  changed();
+}
+
+document.addEventListener("keydown", e => {
+  if ((e.key === "Delete" || e.key === "Backspace") && selected >= 0 &&
+      document.activeElement.tagName !== "INPUT") {
+    preset().cables.splice(selected, 1);
+    selected = -1;
+    changed();
+  }
+});
+
+// ── 6. Side panel ────────────────────────────────────────────────────
+function drawCablePanel() {
+  const box = document.getElementById("cable");
+  box.textContent = "";
+  const c = preset().cables[selected];
+  if (!c) {
+    box.innerHTML = '<p class="note">None selected.</p>';
+    return;
+  }
+  box.innerHTML =
+      '<p class="note"><b>' + c.from + "</b> &rarr; <b>" +
+      ITEMS[c.to].name + "</b></p>" +
+      '<div class="field"><label>Amount: <span id="amt"></span></label>' +
+      '<input type="range" min="-100" max="100" id="amount"></div>' +
+      '<button class="quiet" id="unplug">Remove cable</button>';
+  const range = document.getElementById("amount");
+  range.value = Math.round(c.amount * 100);
+  document.getElementById("amt").textContent = range.value + "%";
+  range.oninput = () => {
+    c.amount = Number(range.value) / 100;
+    document.getElementById("amt").textContent = range.value + "%";
+    save();
+    draw();
+  };
+  document.getElementById("unplug").onclick = () => {
+    preset().cables.splice(selected, 1);
+    selected = -1;
+    changed();
+  };
+}
+
+function drawPots() {
+  const box = document.getElementById("pots");
+  box.textContent = "";
+  POTS.forEach((pin, k) => {
+    const label = document.createElement("span");
+    label.textContent = pin;
+    const sel = document.createElement("select");
+    for (const item of PATCHABLE) {
+      const o = new Option(ITEMS[item].name, item);
+      sel.add(o);
+    }
+    sel.value = preset().knobs[k];
+    sel.onchange = () => { preset().knobs[k] = sel.value; changed(); };
+    box.append(label, sel);
+  });
+}
+
+function drawPresetList() {
+  const sel = document.getElementById("preset");
+  sel.textContent = "";
+  presets.forEach((p, i) => sel.add(new Option(p.name, i)));
+  sel.value = current;
+  document.getElementById("name").value = preset().name;
+}
+
+document.getElementById("preset").onchange = e => {
+  current = Number(e.target.value);
+  selected = -1;
+  refresh();
+};
+document.getElementById("name").oninput = e => {
+  preset().name = e.target.value;
+  drawPresetList();
+  save();
+};
+document.getElementById("new").onclick = () => {
+  presets.push(newPreset("Preset " + (presets.length + 1)));
+  current = presets.length - 1;
+  selected = -1;
+  changed();
+};
+document.getElementById("copy").onclick = () => {
+  const copy = JSON.parse(JSON.stringify(preset()));
+  copy.name = (copy.name + " copy").slice(0, 20);
+  presets.splice(current + 1, 0, copy);
+  current++;
+  changed();
+};
+document.getElementById("delete").onclick = () => {
+  if (presets.length === 1) return;
+  presets.splice(current, 1);
+  current = Math.max(0, current - 1);
+  selected = -1;
+  changed();
+};
+
+// ── 7. Files ─────────────────────────────────────────────────────────
+function toJson() {
+  return JSON.stringify({presets: presets}, null, 2) + "\n";
+}
+
+function load(text) {
+  const list = JSON.parse(text).presets;
+  if (!Array.isArray(list) || !list.length) throw new Error("no presets");
+  presets = list.map(complete);
+  current = 0;
+  selected = -1;
+}
+
+/** Keep the work in this browser between visits (best effort). */
+function save() {
+  try { localStorage.setItem("easelPresets", toJson()); } catch (e) {}
+}
+
+document.getElementById("save").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([toJson()],
+                                        {type: "application/json"}));
+  a.download = "presets.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+document.getElementById("open").onchange = e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  file.text().then(text => {
+    try { load(text); changed(); }
+    catch (err) { alert("Couldn't read " + file.name + ": " + err.message); }
+  });
+  e.target.value = "";
+};
+
+function refresh() {
+  drawPresetList();
+  drawCablePanel();
+  drawPots();
+  draw();
+}
+
+function changed() {
+  save();
+  refresh();
+}
+
+try {
+  const saved = localStorage.getItem("easelPresets");
+  if (saved) load(saved);
+} catch (e) {}
+computeLayout();
+refresh();
+</script>
+</body>
+</html>

@@ -1083,6 +1083,40 @@ on the board whatever the settings, with <code>loop()</code> running
 66 times a second, and uses 50&nbsp;KB of RAM.</p>
 <pre><code>pio run -e noisebox -t upload</code></pre>
 
+<h3>easel_matrix</h3>
+<p><code>noisebox</code>'s voice made patchable, the way a Buchla Music
+Easel is: a fixed set of modules joined by patch cables. Every module
+always runs, and a preset says which outputs are patched to which
+sliders, where every slider and switch sits, and which slider each of
+the eight pots moves. Presets switch from the menu, with no reflash.</p>
+<p>The six outputs are the pulser's falling ramp (PULSER), the
+envelope struck on each pulse (ENV), the sequencer's note (SEQ), a
+random value drawn on each pulse (RANDOM), the mod oscillator (MOD)
+and a Lorenz attractor (CHAOS). A cable adds its amount (&minus;100%
+to 100%) times the output to a slider's position. Nothing is patched
+unless a preset patches it: the sequencer only plays a tune when SEQ
+goes to Pitch at 100%, as on the Easel. A second gate, on the mod
+oscillator, opens on its own level or follows the envelope.</p>
+<p>Presets are drawn in the <a href="easel.html">Easel patcher</a>: a
+panel of the patch's sections, with sliders, switches and jacks to drag
+cables between. It saves a <code>presets.json</code>;
+<code>tools/gen_presets.py</code> turns that into
+<code>presets.h</code>, checking every name against
+<code>main.cpp</code>.</p>
+<pre><code>python3 tools/gen_presets.py examples/easel_matrix/presets.json
+pio run -e easel_matrix -t upload</code></pre>
+<p>Fitting it in took three cuts, each measured on the board. Adding up
+the cables and turning slider positions into settings cost 3.8% of the
+CPU when run every 32 samples, so it runs every 64 (689 times a
+second): plenty for envelopes and wobbles, and MOD into FM or Timbre
+still runs on every sample. A second <code>VactrolLpg</code> cost 6%,
+so Gate B is the simpler <code>LowPassGate</code>, which can't ping on
+its own. And the complex oscillator's anti-alias filter is 2-pole, not
+<code>easel</code>'s 4-pole, which saved 4% at the price of a little
+more aliasing on high, bright notes. The five starting presets measured
+70&ndash;76%, with <code>loop()</code> running 51&ndash;65 times a
+second; 51&nbsp;KB of RAM.</p>
+
 <h3>oled</h3>
 <p>A knob on PA1 sets a tone's pitch, a rotary encoder on PB6/PB7
 transposes it in semitones, and the encoder's push switch on PB5 resets

@@ -1,0 +1,63 @@
+{
+  "presets": [
+    {
+      "name": "Noisebox",
+      "settings": {"GATE_A": 1, "RATE": 50, "DECAY": 40, "TIMBRE": 30, "FM": 20},
+      "cables": [
+        {"from": "SEQ", "to": "PITCH", "amount": 1.0}
+      ],
+      "knobs": ["NOISE", "TIMBRE", "FM", "MOD_RATE", "RATE", "DECAY", "MUTATE", "SPACE"]
+    },
+    {
+      "name": "Bongo",
+      "settings": {"GATE_A": 1, "RATE": 62, "DECAY": 18, "TIMBRE": 45, "FM": 35,
+                   "MUTATE": 10, "SPACE": 25, "COLOUR": 9},
+      "cables": [
+        {"from": "SEQ", "to": "PITCH", "amount": 1.0},
+        {"from": "RANDOM", "to": "TIMBRE", "amount": 0.2}
+      ],
+      "knobs": ["NOISE", "TIMBRE", "FM", "MOD_RATE", "RATE", "DECAY", "MUTATE", "SPACE"]
+    },
+    {
+      "name": "Drone",
+      "settings": {"GATE_A": 0, "LEVEL_A": 55, "RATE": 10, "ATTACK": 70,
+                   "DECAY": 80, "MOD_TRACK": 0, "MOD_RATE": 18, "FM": 30,
+                   "TIMBRE": 35, "SPACE": 60, "MUTATE": 30, "PITCH": 43,
+                   "COLOUR": 3, "CHAOS_RATE": 20},
+      "cables": [
+        {"from": "SEQ", "to": "PITCH", "amount": 1.0},
+        {"from": "ENV", "to": "LEVEL_A", "amount": 0.4},
+        {"from": "ENV", "to": "TIMBRE", "amount": 0.25},
+        {"from": "MOD", "to": "TIMBRE", "amount": 0.3},
+        {"from": "CHAOS", "to": "FM", "amount": 0.3}
+      ],
+      "knobs": ["NOISE", "TIMBRE", "FM", "MOD_RATE", "RATE", "LEVEL_A", "CHAOS_RATE", "SPACE"]
+    },
+    {
+      "name": "Mayhem",
+      "settings": {"GATE_A": 1, "RATE": 75, "DECAY": 30, "MOD_WAVE": 3,
+                   "MOD_TRACK": 0, "MOD_RATE": 80, "FM": 60, "NOISE": 30,
+                   "CRUSH": 30, "FEEDBACK": 70, "ECHO_MIX": 40,
+                   "ECHO_TIME": 12, "MUTATE": 60},
+      "cables": [
+        {"from": "SEQ", "to": "PITCH", "amount": 1.0},
+        {"from": "CHAOS", "to": "PITCH", "amount": 0.1},
+        {"from": "RANDOM", "to": "TIMBRE", "amount": 0.3},
+        {"from": "PULSER", "to": "CRUSH", "amount": 0.3},
+        {"from": "ENV", "to": "FM", "amount": 0.4}
+      ],
+      "knobs": ["NOISE", "TIMBRE", "FM", "MOD_RATE", "RATE", "CRUSH", "FEEDBACK", "ECHO_MIX"]
+    },
+    {
+      "name": "Two Voices",
+      "settings": {"GATE_A": 1, "GATE_B": 1, "LEVEL_B": 70, "MOD_TRACK": 1,
+                   "MOD_RATE": 60, "FM": 10, "RATE": 55, "DECAY": 35,
+                   "SPACE": 40},
+      "cables": [
+        {"from": "SEQ", "to": "PITCH", "amount": 1.0},
+        {"from": "RANDOM", "to": "MOD_RATE", "amount": 0.15}
+      ],
+      "knobs": ["NOISE", "TIMBRE", "FM", "MOD_RATE", "RATE", "DECAY", "LEVEL_B", "SPACE"]
+    }
+  ]
+}

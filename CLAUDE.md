@@ -24,7 +24,7 @@ The project has an educational focus: highly documented code and a
 - **Build one:** `pio run -e singing_bowls` (envs: minimal, singing_bowls,
   drum_machine, custom_voice, compile_all, profile, profile_all, patch_minimal,
   patch_demo, patch_hardware, patch_param, minimal_f401, oled,
-  aeolian_harp, easel, acid, noisebox)
+  aeolian_harp, easel, acid, noisebox, easel_matrix)
 - **Upload:** `pio run -e <env> -t upload` (ST-Link on the SW header: DIO to
   SWDIO, SCK to SWCLK, GND; DFU is unreliable on WeAct F411 boards)
 - **Serial Monitor:** `pio device monitor` (examples print `AudioEngine::cpuLoad()`)
@@ -42,6 +42,9 @@ The project has an educational focus: highly documented code and a
 - **Module list:** `python3 tools/gen_modules.py` (after changing a module's
   API, or after pasting new `profile_all` output into `tools/costs.csv`)
 - **Generate a patch:** `python3 tools/gen_patch.py examples/patch_minimal/patch.json`
+- **Easel presets:** draw them in `docs/easel.html`, save `presets.json` into
+  `examples/easel_matrix/`, then `python3 tools/gen_presets.py
+  examples/easel_matrix/presets.json` (writes `presets.h`; never edit by hand)
 
 ## Hardware Specifications
 - **I2S Pins:** `PB12` (LRCLK), `PB13` (BCLK), `PB15` (DIN)
@@ -70,6 +73,8 @@ The project has an educational focus: highly documented code and a
 - `tools/gen_patch.py` — turns a `patch.json` into `patch_graph.h` (never edit
   by hand), plus a starter `main.cpp` if there is none. Hardware is read in
   `patch::control()`, called from `loop()`; never `delay()` in `loop()`
+- `docs/easel.html` — standalone preset patcher for `examples/easel_matrix`
+  (draw cables on a panel); its item list mirrors that `main.cpp`
 - `docs/editor.html` — standalone patch editor (plain JS + SVG, black and
   white, no `style.css`); keep its cost maths in step with `gen_patch.py`
 
