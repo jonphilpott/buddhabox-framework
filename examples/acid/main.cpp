@@ -25,8 +25,8 @@
  *   "wow".
  * - Chaos: a Lorenz attractor (mod/lorenz.h) wanders the cutoff (up to
  *   two octaves either way) and the resonance, as on noisebox. Chaos
- *   Rate runs from a slow drift, a loop every ten seconds or so, to a
- *   fast wobble.
+ *   Rate runs from about one loop a minute to about 5 a second: slow
+ *   sweeps for trance and acid, never a buzz.
  *
  * THE EFFECTS: a tempo-synced echo (3/16, the dotted eighth, by
  * default: each repeat lands off the beat), its repeats darkened by a
@@ -286,9 +286,11 @@ void applyMenu() {
   spring.setAmount(items[REVERB].value / 100.0f);
   randomChance = items[RANDOM].value / 100.0f;
   chaosAmount = items[CHAOS].value / 100.0f;
-  // Capped at 0.84: at this slow update rate, a bigger step makes the
-  // attractor's simple maths blow up (as in easel_matrix).
-  chaos.setRate(0.2f + 0.64f * items[CHAOS_RATE].value / 100.0f);
+  // Lorenz rate 0.30 to 0.55: about 0.02 to 4.8 loops a second at this
+  // update rate (measured on the host over two minutes each). The
+  // rate is exponential, so each step of the menu speeds the loops up
+  // by the same ratio, as a tempo knob would.
+  chaos.setRate(0.30f + 0.25f * items[CHAOS_RATE].value / 100.0f);
 }
 
 /** Start the next step of the sequence (audio interrupt). */
