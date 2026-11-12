@@ -39,7 +39,7 @@ PLATFORMIO_INI = """\
 ;   pio device monitor   serial output
 
 [env:{name}]
-platform = ststm32@15.4.1
+platform = ststm32@20.0.0
 board = blackpill_f411ce   ; or blackpill_f401cc
 framework = arduino
 ; An ST-Link on the SW header. The ROM DFU bootloader on WeAct F411

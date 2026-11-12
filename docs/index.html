@@ -150,7 +150,7 @@ the pin to ground.</p>
 path uses your local checkout directly, so edits to the framework show up
 immediately:</p>
 <pre><code>[env:myproject]
-platform = ststm32@15.4.1
+platform = ststm32@20.0.0
 board = blackpill_f411ce   ; or blackpill_f401cc
 framework = arduino
 upload_protocol = stlink   ; or dfu: see "Build and upload"
@@ -545,7 +545,9 @@ with <code>AudioEngine::cpuLoad()</code>.</p>
 
 <h3>Measured CPU cost</h3>
 <p>Measured on an F411 Black Pill at 96 MHz with the <code>profile_all</code>
-example (GCC 9, <code>-O2</code>), fastest of five runs of 4,096 samples,
+example (GCC 9, <code>-O2</code>; the GCC 12 that
+<code>ststm32@20.0.0</code> brings measured the same or up to 5% lower on
+whole patches), fastest of five runs of 4,096 samples,
 loop overhead removed. Inputs are full-scale white noise; drums, plucks
 and envelopes are kept sounding. Shares are of the F411's 2,177 cycles
 per sample. Cycle counts are within 3% of the 84 MHz F401's, so on an

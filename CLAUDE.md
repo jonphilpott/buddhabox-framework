@@ -12,9 +12,10 @@ The project has an educational focus: highly documented code and a
 "modular synth" approach where DSP components are wired together in code.
 
 ### Core Tech Stack
-- **Language:** C++14 (GCC 9, `-fno-exceptions -fno-rtti`)
+- **Language:** C++14 code (GCC 12, which compiles it as gnu++17;
+  `-fno-exceptions -fno-rtti`)
 - **Framework:** Arduino (STM32 core)
-- **Build System:** PlatformIO (Platform: `ststm32@15.4.1`)
+- **Build System:** PlatformIO (Platform: `ststm32@20.0.0`)
 - **Hardware Platform:** STM32F411CE (96MHz ARM Cortex-M4F, 128 KB RAM, 512 KB flash)
 - **Audio Interface:** I2S with DMA double-buffering
 - **Sample Rate:** 44100 Hz, 256-frame blocks (~2177 CPU cycles per sample)

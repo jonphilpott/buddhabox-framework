@@ -81,7 +81,7 @@ Or add it to an existing project's `platformio.ini`:
 
 ```ini
 [env:myproject]
-platform = ststm32@15.4.1
+platform = ststm32@20.0.0
 board = blackpill_f411ce   ; or blackpill_f401cc
 framework = arduino
 upload_protocol = stlink   ; an ST-Link on the SW header; see the guide
