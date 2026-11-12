@@ -3102,7 +3102,7 @@
   "header": "buddhabox/fx/spring_reverb.h",
   "category": "fx",
   "brief": "",
-  "template": "uint16_t SIZE = 2048",
+  "template": "uint16_t SIZE = 2048, int STRETCH = 4",
   "call": "process",
   "returns": "stereo",
   "inputs": [

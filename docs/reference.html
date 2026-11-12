@@ -2863,13 +2863,13 @@ reverb.process(l, r); // in place</code></pre>
 <p>A spring reverb sends sound down a coiled spring and picks it up at the other end. A spring is dispersive: different frequencies travel along it at different speeds. So a click goes in and comes out smeared into a &quot;chirp&quot;, a quick whistling sweep. The sound bounces back and forth along the spring, and every trip smears it further, which turns each echo into a longer chirp: the &quot;drip&quot; and &quot;boing&quot; a hall reverb never makes.</p>
 <p>HOW THIS MODEL WORKS (after Parker and Valimaki&#x27;s spring models):</p>
 <p>in ─► high-pass ─► (+) ─► 12 all-passes ─► delay ─► low-pass ─┬─► out ▲     (the chirp)    (one trip)  (losses) │ └──────────── x feedback ◄────────────────┘</p>
-<ul><li>High-pass: real tanks pass little bass, which keeps them from booming.</li><li>Dispersion: a chain of all-pass filters. An all-pass passes every frequency at the same level but delays some more than others, so in a long enough chain a click spreads out into a chirp. Each one is &quot;stretched&quot; (it uses the sample 4 back, not 1 back), which moves the chirp into the spring&#x27;s range, below about 5.5 kHz.</li><li>Delay: the time for one trip along the spring, 35 to 42 ms.</li><li>Low-pass and feedback: each trip loses some treble and some level, so echoes get darker and quieter. The low-pass also removes the stretched all-passes&#x27; copies of the chirp above 5.5 kHz.</li></ul>
+<ul><li>High-pass: real tanks pass little bass, which keeps them from booming.</li><li>Dispersion: a chain of all-pass filters. An all-pass passes every frequency at the same level but delays some more than others, so in a long enough chain a click spreads out into a chirp. Each one is &quot;stretched&quot; (it uses the sample 4 back, not 1 back), which moves the chirp into the spring&#x27;s range, below about 5.5 kHz. At half rate, 2 back is the same time (see STRETCH below).</li><li>Delay: the time for one trip along the spring, 35 to 42 ms.</li><li>Low-pass and feedback: each trip loses some treble and some level, so echoes get darker and quieter. The low-pass also removes the stretched all-passes&#x27; copies of the chirp above 5.5 kHz.</li></ul>
 <p>Two springs of different lengths, one per output, give a wide stereo image from a mono input, as real two- and three-spring tanks do.</p>
 <h5>Cost</h5>
 <p>466 cycles a sample on the F411 (21% of the budget), nearly all of it the 24 all-pass sections; 2 x SIZE x 4 bytes of RAM, 16 KB at the default size.</p>
 <div class="module-card" id="springreverb">
 <h4>SpringReverb</h4>
-<div class="method-sig">template &lt;uint16_t SIZE = 2048&gt; class SpringReverb</div>
+<div class="method-sig">template &lt;uint16_t SIZE = 2048, int STRETCH = 4&gt; class SpringReverb</div>
 <p>A stereo spring reverb tank.</p>
 <p class="example-label">Example — on a voice&#x27;s output:</p>
 <pre><code>SpringReverb&lt;&gt; spring;
@@ -2879,8 +2879,13 @@ spring.setAmount(0.35f);
 // In audio callback:
 float left = voice, right = voice;
 spring.process(left, right);</code></pre>
-<div class="method-param">Template <code>SIZE</code> — Delay per spring in samples; must hold the longer trip (1871 samples), so 2048 is the smallest that works</div>
-<p class="example-label">Instantiation</p><pre><code>SpringReverb&lt;&gt; name;   // template defaults: uint16_t SIZE = 2048</code></pre>
+<p class="example-label">Example — at half rate, for half the cost (examples/noisebox):</p>
+<pre><code>SpringReverb&lt;1024, 2&gt; spring; // 8 KB
+spring.init(SAMPLE_RATE / 2);
+// call process() on every second sample, fill the gaps in between</code></pre>
+<div class="method-param">Template <code>SIZE</code> — Delay per spring in samples; must hold the longer trip (1871 samples at 44.1 kHz), so 2048 is the smallest that works at the full rate</div>
+<div class="method-param">Template <code>STRETCH</code> — How many samples back each all-pass reaches (a power of two). 4 at 44.1 kHz; 2 at half rate, which delays by the same time and so keeps the same chirp</div>
+<p class="example-label">Instantiation</p><pre><code>SpringReverb&lt;&gt; name;   // template defaults: uint16_t SIZE = 2048, int STRETCH = 4</code></pre>
 <div class="method-block"><div class="method-sig">void init(float sampleRate = SAMPLE_RATE)</div><div class="method-desc"><p>Clear the springs and set the defaults (time 0.75, tone 0.5, chirp 0.5, amount 0.3).</p>
 <div class="method-param">Param <code>sampleRate</code> — Sample rate in Hz</div></div></div>
 <div class="method-block"><div class="method-sig">void setTime(float x)</div><div class="method-desc"><p>How long the tail rings: the feedback around each spring.</p>

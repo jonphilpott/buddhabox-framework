@@ -22,8 +22,9 @@
  * 2. Dispersion: a chain of all-pass filters. An all-pass passes every
  *    frequency at the same level but delays some more than others, so
  *    in a long enough chain a click spreads out into a chirp. Each one is
- *    "stretched" (it uses the sample 4 back, not 1 back), which moves the
- *    chirp into the spring's range, below about 5.5 kHz.
+ *    "stretched" (it uses the sample 4 back, not 1 back), which moves
+ *    the chirp into the spring's range, below about 5.5 kHz. At half
+ *    rate, 2 back is the same time (see STRETCH below).
  * 3. Delay: the time for one trip along the spring, 35 to 42 ms.
  * 4. Low-pass and feedback: each trip loses some treble and some level,
  *    so echoes get darker and quieter. The low-pass also removes the
@@ -47,8 +48,12 @@ namespace bb {
 /**
  * A stereo spring reverb tank.
  *
- * @tparam SIZE  Delay per spring in samples; must hold the longer trip
- *               (1871 samples), so 2048 is the smallest that works
+ * @tparam SIZE     Delay per spring in samples; must hold the longer
+ *                  trip (1871 samples at 44.1 kHz), so 2048 is the
+ *                  smallest that works at the full rate
+ * @tparam STRETCH  How many samples back each all-pass reaches (a power
+ *                  of two). 4 at 44.1 kHz; 2 at half rate, which delays
+ *                  by the same time and so keeps the same chirp
  *
  * Example — on a voice's output:
  *   SpringReverb<> spring;
@@ -58,8 +63,13 @@ namespace bb {
  *   // In audio callback:
  *   float left = voice, right = voice;
  *   spring.process(left, right);
+ *
+ * Example — at half rate, for half the cost (examples/noisebox):
+ *   SpringReverb<1024, 2> spring; // 8 KB
+ *   spring.init(SAMPLE_RATE / 2);
+ *   // call process() on every second sample, fill the gaps in between
  */
-template <uint16_t SIZE = 2048> class SpringReverb {
+template <uint16_t SIZE = 2048, int STRETCH = 4> class SpringReverb {
 public:
   SpringReverb() { init(); }
 
@@ -154,8 +164,8 @@ public:
   }
 
 private:
-  static const int kSections = 12; // all-passes per spring
-  static const int kStretch = 4;   // a power of two: wrap with & 3
+  static const int kSections = 12;     // all-passes per spring
+  static const int kStretch = STRETCH; // a power of two: wrap with &
 
   struct Spring {
     DelayLine<SIZE, float> delay;

@@ -1046,6 +1046,35 @@ the sample rate, which roughly halves their cost. The whole patch uses
 would add another 11%, enough to make the encoder sluggish.</p>
 <pre><code>pio run -e acid -t upload</code></pre>
 
+<h3>noisebox</h3>
+<p>A West Coast noise box: <code>easel</code>'s voice as an instrument
+rather than a self-playing patch. A pulser steps a random sequence of
+1 to 8 notes and strikes a low-pass gate. The voice is a complex
+oscillator (a sine, frequency-modulated by a second oscillator, plus
+white noise, wavefolded at twice the sample rate), and after the gate
+come a sample-rate crusher, an echo and the spring. The eight pots
+are the panel: Pitch on PA1, Timbre PA2, FM PA3, Mod Rate PA4, Rate
+(the pulser, 4&nbsp;s to 30&nbsp;ms) PA5, Decay PA6, Random PA7 and
+Space (the spring) PB0. Random is the chance that each pulse rewrites
+the step about to play: at 0 the loop repeats forever, at full every
+note is new. The menu holds the routing: the mod oscillator's wave
+(triangle, saw, square or stepped noise), whether it follows the
+pitch as a ratio or runs free from 0.05&nbsp;Hz to 2&nbsp;kHz, how
+much it moves the folding, its own level, the noise, a sine or analog
+fold curve, a Lorenz attractor wobbling Timbre and FM, the crusher,
+Ping or Drone for the gate, the sequence's length and scale, and the
+echo. Wiring as for <code>acid</code>.</p>
+<p>The spring runs at half the sample rate, with the gaps filled by
+straight-line interpolation as for <code>acid</code>'s drums. A
+real spring passes little above 5&nbsp;kHz, and
+<code>SpringReverb&lt;1024, 2&gt;</code> reaches 2 samples back where
+the full-rate tank reaches 4: the same time, so the same chirp. The
+crusher is skipped at 0, since it cost about 5% even when passing
+the sound straight through. The patch measured 71&ndash;74% of the CPU
+on the board whatever the settings, with <code>loop()</code> running
+66 times a second, and uses 50&nbsp;KB of RAM.</p>
+<pre><code>pio run -e noisebox -t upload</code></pre>
+
 <h3>oled</h3>
 <p>A knob on PA1 sets a tone's pitch, a rotary encoder on PB6/PB7
 transposes it in semitones, and the encoder's push switch on PB5 resets
