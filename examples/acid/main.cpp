@@ -11,6 +11,7 @@
  *        cutoff ───┘    │              └── gate: on for half a step,
  *        + env mod × filter envelope       held through a slide
  *        + accent
+ *        + chaos (resonance too)
  *
  * - The filter is an MS-20 (Ms20Filter) by default: its resonance
  *   keeps the bass. The Filter item switches to the Moog ladder
@@ -22,31 +23,23 @@
  * - A slide holds the gate into the next step and glides the pitch
  *   there, without re-striking the filter envelope: the 303's legato
  *   "wow".
+ * - Chaos: a Lorenz attractor (mod/lorenz.h) wanders the cutoff (up to
+ *   two octaves either way) and the resonance, as on noisebox. Chaos
+ *   Rate runs from a slow drift, a loop every ten seconds or so, to a
+ *   fast wobble.
  *
  * THE EFFECTS: a tempo-synced echo (3/16, the dotted eighth, by
  * default: each repeat lands off the beat), its repeats darkened by a
  * low-pass in the feedback path like a tape or analog delay; then the
  * spring reverb, which also spreads the mono voice into stereo.
  *
- * THE DRUMS: a kick on every beat and a snare on 2 and 4, kept dry (no
- * echo or spring) so they stay tight. The Drums item sets their level;
- * at 0 they're skipped altogether.
- *
- * WHY THE KICK AND SNARE RUN AT HALF RATE: in this patch they measured
- * 16% (kick) and 14% (snare) of the CPU at the full rate. A kick has
- * almost nothing above 5 kHz and a snare little above 10, so both are
- * computed every other sample (22 kHz) and the gaps filled by
- * straight-line interpolation, which roughly halves their cost.
- *
- * WHY NO HI-HAT: a HiHat (drums/hihat.h) took another 11%, which put
- * the patch at 85%. It ran, but loop() got so little time that the
- * encoder felt sluggish. A hat can't be halved like the others: its
- * sizzle is all high frequencies.
- *
  * THE SEQUENCE: notes come from a Colour, a five-note just scale with
  * 16 flavours from dark to bright (mod/colour.h). Randomize rolls a new
  * 16-step melody over two octaves, plus random accents, slides, rests
  * and octave jumps. Changing Colour keeps the melody and re-tunes it.
+ * Random is the noisebox's "Turing machine": on each step, the chance
+ * of rewriting the step about to play (its note, accent, slide and
+ * rest). At 0 the bar repeats forever; at 100 every step is new.
  *
  * THE MENU (encoder; Menu in io/menu.h does the work):
  *   turn          move between items
@@ -62,22 +55,20 @@
  *   Knobs    (optional) 8 pots, each with its outer legs to 3V3 and
  *            GND and its wiper to a pin (10k or 100k both work):
  *              PA1 Cutoff     PA2 Resonance   PA3 Env Mod   PA4 Decay
- *              PA5 Accent     PA6 Drive       PA7 Tempo     PB0 Delay Mix
+ *              PA5 Accent     PA6 Drive       PA7 Chaos     PB0 Delay Mix
  *            Set kKnobs = false without them, or the unconnected pins'
  *            noise will move the settings. (PA0 is skipped: the board's
  *            KEY button is on it.)
  *
- * Cost: 72% of the F411's CPU, measured on the board: 56% without the
- * drums (the spring alone is about 21%). 89 KB of RAM, 64 KB of it the
- * echo's buffer.
+ * Cost: 56% of the F411's CPU, measured on the board with Chaos, its
+ * rate and Random all at full (the spring alone is about 21%). 89 KB of RAM, 64
+ * KB of it the echo's buffer.
  */
 
 #include <Arduino.h>
 
 #include "buddhabox/core/dsp_common.h"
 #include "buddhabox/core/random.h"
-#include "buddhabox/drums/analog_kick.h"
-#include "buddhabox/drums/synth_snare.h"
 #include "buddhabox/engine/audio_engine.h"
 #include "buddhabox/filter/moog_filter.h"
 #include "buddhabox/filter/ms20_filter.h"
@@ -92,6 +83,7 @@
 #include "buddhabox/mod/clock.h"
 #include "buddhabox/mod/colour.h"
 #include "buddhabox/mod/envelope.h"
+#include "buddhabox/mod/lorenz.h"
 #include "buddhabox/osc/basic.h"
 
 using namespace bb;
@@ -117,11 +109,13 @@ enum Item {
   WAVE,
   FILTER,
   COLOUR,
+  RANDOM,
+  CHAOS,
+  CHAOS_RATE,
   DELAY_TIME,
   DELAY_MIX,
   FEEDBACK,
   REVERB,
-  DRUMS,
   RANDOMIZE, // an action, not a value
   kItems
 };
@@ -140,12 +134,14 @@ MenuItem items[kItems] = {
     {"Wave", 0, 0, 1, 1, kWaves},
     {"Filter", 1, 0, 1, 1, kFilters},
     {"Colour", 6, 0, 15, 1},
+    {"Random", 0, 0, 100, 2},
+    {"Chaos", 0, 0, 100, 2},
+    {"Chaos Rate", 40, 0, 100, 2},
     {"Delay Time", 3, 1, 6, 1, nullptr,
      "/16"}, // in sixteenths: 3 = dotted eighth
     {"Delay Mix", 30, 0, 100, 2},
     {"Feedback", 45, 0, 90, 2},
     {"Reverb", 25, 0, 100, 2},
-    {"Drums", 70, 0, 100, 2},
     {"Randomize"}, // step 0: an action
 };
 Menu menu(items, kItems);
@@ -165,7 +161,7 @@ Knob knobs[] = {
     {AnalogInput(PA1, 0.7f), CUTOFF},  {AnalogInput(PA2, 0.7f), RESONANCE},
     {AnalogInput(PA3, 0.7f), ENV_MOD}, {AnalogInput(PA4, 0.7f), DECAY},
     {AnalogInput(PA5, 0.7f), ACCENT},  {AnalogInput(PA6, 0.7f), DRIVE},
-    {AnalogInput(PA7, 0.7f), TEMPO},   {AnalogInput(PB0, 0.7f), DELAY_MIX},
+    {AnalogInput(PA7, 0.7f), CHAOS},   {AnalogInput(PB0, 0.7f), DELAY_MIX},
 };
 
 // ── Modules ──────────────────────────────────────────────────────────
@@ -180,15 +176,14 @@ Overdrive drive;
 // BPM, 3/16 below 61); a float or longer buffer won't fit.
 DelayLine<32768> echo;
 SpringReverb<> spring;
-AnalogKick kick;  // 808-style
-SynthSnare snare; // 909-style: cheaper than AnalogSnare, and snappier
-float drumLevel = 0.0f;
-// Half-rate drums: the last two values computed, and which sample of
-// each pair this is.
-float slowPrevious = 0.0f, slowNow = 0.0f;
-bool oddSample = false;
 TempoClock tempo(125.0f, 4); // 4 ticks a beat: sixteenth notes
 Colour colour;
+// Runs once per cutoff update (kFilterEvery samples), not every sample:
+// an eighth of the cost, and still far faster than the fastest wobble.
+Lorenz chaos;
+// Shared by randomize() in loop() and Random in the interrupt. If one
+// interrupts the other mid-draw, two numbers may come out the same:
+// harmless here.
 LFSR rng(303);
 
 EncoderInput encoder;
@@ -215,6 +210,8 @@ float cutoffFine = -1.0f;
 float envModSemis = 0.0f; // how far the envelope opens it
 float accentAmount = 0.0f;
 float resonance = 0.0f;
+float chaosAmount = 0.0f;  // Chaos, 0-1
+float randomChance = 0.0f; // Random, 0-1
 
 // ── Playback state (audio interrupt only, except `step` for display)
 volatile int step = kSteps - 1; // so the first tick plays step 0
@@ -229,6 +226,18 @@ float echoTone = 0.0f; // the feedback low-pass's state
 int filterCounter = 0;
 
 /**
+ * Roll one step's accent, slide and rest. Used by randomize() and by
+ * Random in the interrupt, so both scatter them the same way.
+ * @param i  The step, 0 to kSteps - 1
+ */
+void rollStep(int i) {
+  accents[i] = rng.nextFloat() < 0.25f;
+  slides[i] = rng.nextFloat() < 0.2f;
+  // Step 0 always plays, so the bar has an anchor.
+  rests[i] = i > 0 && rng.nextFloat() < 0.15f;
+}
+
+/**
  * Roll a new sequence: a Colour melody over two octaves, then accents,
  * slides, rests and octave jumps scattered over it.
  */
@@ -240,10 +249,7 @@ void randomize() {
     if (n < 5 && rng.nextFloat() < 0.2f)
       n += 5;
     notes[i] = n;
-    accents[i] = rng.nextFloat() < 0.25f;
-    slides[i] = rng.nextFloat() < 0.2f;
-    // Step 0 always plays, so the bar has an anchor.
-    rests[i] = i > 0 && rng.nextFloat() < 0.15f;
+    rollStep(i);
   }
 }
 
@@ -260,9 +266,8 @@ void applyMenu() {
   // Env Mod: up to four more octaves at the envelope's peak.
   envModSemis = 0.48f * items[ENV_MOD].value;
   // Resonance stops short of 1.0, where both filters ring on their own.
+  // The interrupt sets it on the filters, with the chaos added.
   resonance = 0.0096f * items[RESONANCE].value;
-  ladder.setResonance(resonance);
-  ms20.setResonance(resonance);
   useMs20 = items[FILTER].value;
   // Decay: 0.1 to 2 seconds, squared so the short, snappy settings get
   // more of the range.
@@ -279,26 +284,24 @@ void applyMenu() {
   echoMix = items[DELAY_MIX].value / 100.0f;
   echoFeedback = items[FEEDBACK].value / 100.0f;
   spring.setAmount(items[REVERB].value / 100.0f);
-  drumLevel = items[DRUMS].value / 100.0f;
-}
-
-/**
- * Trigger this step's drums (audio interrupt). Steps are sixteenths,
- * so 0, 4, 8 and 12 are the beats.
- */
-void playDrums(int s) {
-  if (s % 4 == 0)
-    kick.trigger();
-  if (s == 4 || s == 12)
-    snare.trigger();
+  randomChance = items[RANDOM].value / 100.0f;
+  chaosAmount = items[CHAOS].value / 100.0f;
+  // Capped at 0.84: at this slow update rate, a bigger step makes the
+  // attractor's simple maths blow up (as in easel_matrix).
+  chaos.setRate(0.2f + 0.64f * items[CHAOS_RATE].value / 100.0f);
 }
 
 /** Start the next step of the sequence (audio interrupt). */
 void nextStep() {
   int s = (step + 1) % kSteps;
+  // Random: maybe rewrite this step before it plays. A slide on the
+  // step before still glides into whatever note lands here.
+  if (rng.nextFloat() < randomChance) {
+    notes[s] = (uint8_t)rng.nextRange(0, 9);
+    rollStep(s);
+  }
   step = s;
   int previous = (s + kSteps - 1) % kSteps;
-  playDrums(s);
   // A slide on the previous step means its gate is still open: glide
   // into this note instead of striking it.
   bool sliding = slides[previous] && !rests[previous];
@@ -349,15 +352,24 @@ void audioCallback(int16_t *buffer, uint16_t length) {
     //    every sample, so it runs every kFilterEvery samples: 5.5 kHz,
     //    still far quicker than the fastest sweep. The cutoff adds up
     //    in semitones (base + envelope + accent), which matches how
-    //    the ear hears a sweep.
+    //    the ear hears a sweep. Chaos adds up to two octaves either
+    //    way to the cutoff, and moves the resonance with the Lorenz's
+    //    y, which leads x: the two never move quite together.
     if (++filterCounter >= kFilterEvery) {
       filterCounter = 0;
-      float semis = cutoffSemis + (envModSemis + 24.0f * accent) * fenv;
+      chaos.process();
+      float semis = cutoffSemis + (envModSemis + 24.0f * accent) * fenv +
+                    24.0f * chaosAmount * chaos.x();
       float hz = 40.0f * semitonesToRatio(semis);
-      if (useMs20)
+      float res =
+          clampf(resonance + 0.4f * chaosAmount * chaos.y(), 0.0f, 0.96f);
+      if (useMs20) {
+        ms20.setResonance(res);
         ms20.setFrequency(hz);
-      else
+      } else {
+        ladder.setResonance(res);
         ladder.setFrequency(hz);
+      }
     }
 
     // 5. Oscillator, filter, VCA (an accent adds up to 80% level),
@@ -379,23 +391,8 @@ void audioCallback(int16_t *buffer, uint16_t length) {
     float left = x, right = x;
     spring.process(left, right);
 
-    // 8. Drums, added dry after the effects. Skipped at level 0.
-    if (drumLevel > 0.0f) {
-      // Kick and snare on even samples only. Output, per pair: the
-      // midpoint of the last two values, then the newest one: a
-      // straight line through them, a quarter of a millisecond late.
-      if (!oddSample) {
-        slowPrevious = slowNow;
-        slowNow = kick.process() * 0.8f + snare.process() * 0.4f;
-      }
-      float slow = oddSample ? slowNow : 0.5f * (slowPrevious + slowNow);
-      oddSample = !oddSample;
-      left += drumLevel * slow;
-      right += drumLevel * slow;
-    }
-
-    // 9. Out, through a soft limiter: bass and drums together can
-    //    pass full scale, and this rounds the peaks off instead of
+    // 8. Out, through a soft limiter: the resonant, overdriven bass
+    //    can pass full scale, and this rounds the peaks off instead of
     //    clipping them flat.
     buffer[i] = (int16_t)(softLimitClip(left) * 30000.0f);
     buffer[i + 1] = (int16_t)(softLimitClip(right) * 30000.0f);
@@ -443,14 +440,9 @@ void setup() {
   filterEnv.setAttack(0.002f);
   // One-pole glide: the coefficient that covers most of the way to the
   // target in kGlideSeconds (library maths: once, here).
-  kick.init(SAMPLE_RATE / 2); // half rate: see the file header
-  snare.init(SAMPLE_RATE / 2);
-  kick.setFrequency(48.0f);
-  kick.setDecay(0.55f);
-  snare.setFrequency(190.0f);
-  snare.setSnappy(0.65f);
   spring.setTime(0.6f); // a medium splash, not a wash
   spring.setTone(0.5f);
+  chaos.init(SAMPLE_RATE / kFilterEvery); // see the Lorenz's note
   glideCoefficient = 1.0f - expf(-3.0f / (kGlideSeconds * SAMPLE_RATE));
   colour.setRoot(kRoot);
   applyMenu();

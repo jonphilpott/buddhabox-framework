@@ -1068,8 +1068,15 @@ filter, with a filter envelope that snaps open on every note. Its notes
 come from a <code>Colour</code> scale. The OLED shows the sequence and a
 menu: turn the encoder to pick an item, press to edit it, turn to change
 it. The items are Tempo, Cutoff, Resonance, Env Mod, Decay, Accent,
-Drive, Wave, Filter, Colour, Delay Time, Delay Mix, Feedback, Reverb
-and Randomize, which rolls a new sequence.
+Drive, Wave, Filter, Colour, Random, Chaos, Chaos Rate, Delay Time,
+Delay Mix, Feedback, Reverb and Randomize, which rolls a new sequence.
+Random is noisebox's "Turing machine": on each step, the chance of
+rewriting the step about to play (note, accent, slide and rest), so at
+0 the bar repeats and higher up it keeps changing. Chaos lets a
+<code>Lorenz</code> attractor wander the cutoff, up to two octaves either
+way, and the resonance; Chaos Rate runs from a slow drift to a fast
+wobble. The attractor is stepped only with each cutoff update (every 8
+samples), which costs an eighth as much as stepping it every sample.
 Filter switches between <code>Ms20Filter</code>, whose resonance keeps
 the bass, and the Moog ladder, whose bass thins as resonance rises.
 The MS-20 turns its input down to a quarter inside the loop, so its
@@ -1079,15 +1086,11 @@ the overdrive and the final soft clip.
 The voice then goes through a tempo-synced echo, 3/16 by default, whose
 repeats darken as they fade, and the spring reverb. Wiring as for
 <code>oled</code>, plus eight optional pots: Cutoff on PA1, Resonance
-PA2, Env Mod PA3, Decay PA4, Accent PA5, Drive PA6, Tempo PA7 and Delay
-Mix PB0. Turning one sets its menu item, so the screen always shows
+PA2, Env Mod PA3, Decay PA4, Accent PA5, Drive PA6, Chaos PA7 and Delay
+Mix PB0; Tempo is set from the menu. Turning one sets its menu item, so the screen always shows
 where the knobs are. Set <code>kKnobs</code> to <code>false</code>
-without them. A kick on
-the beat and a snare on 2
-and 4 play underneath, dry; Drums sets their level. Both run at half
-the sample rate, which roughly halves their cost. The whole patch uses
-72% of the CPU (56% without the drums) and 89&nbsp;KB of RAM. A hi-hat
-would add another 11%, enough to make the encoder sluggish.</p>
+without them. The patch uses 56% of the CPU, with Chaos, Chaos Rate and
+Random all at full, and 89&nbsp;KB of RAM.</p>
 <pre><code>pio run -e acid -t upload</code></pre>
 
 <h3>noisebox</h3>
@@ -1111,7 +1114,7 @@ fold curve, a Lorenz attractor wobbling Timbre and FM, the crusher,
 Ping or Drone for the gate, the sequence's length and scale, and the
 echo. Wiring as for <code>acid</code>.</p>
 <p>The spring runs at half the sample rate, with the gaps filled by
-straight-line interpolation as for <code>acid</code>'s drums. A
+straight-line interpolation. A
 real spring passes little above 5&nbsp;kHz, and
 <code>SpringReverb&lt;1024, 2&gt;</code> reaches 2 samples back where
 the full-rate tank reaches 4: the same time, so the chirp stays in
