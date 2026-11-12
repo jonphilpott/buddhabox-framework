@@ -83,7 +83,51 @@ Pill's 96 MHz Cortex-M4 and 128 KB of RAM. The older F401 Black Pill
 <section id="quickstart">
 <h2>Quick start</h2>
 
-<h3>1. Create a project</h3>
+<h3>1. Install the tools</h3>
+<p>You need git, Python 3 and
+<a href="https://platformio.org">PlatformIO Core</a> (the
+<code>pio</code> command). The first build downloads everything else into
+<code>~/.platformio</code>: the ARM compiler, the STM32 Arduino core and
+the ST-Link upload tool, a few hundred MB in all. The Python tools in
+<code>tools/</code> use only the standard library.</p>
+
+<h4>macOS</h4>
+<pre><code>xcode-select --install     # git and clang++ (for the host tests)
+brew install platformio    # from https://brew.sh</code></pre>
+<p>On macOS 26, the first time you plug in an ST-Link or a USB hub the
+system asks whether to allow it. Until you do, uploads fail.</p>
+
+<h4>Linux</h4>
+<p>Install git, Python (with <code>venv</code>) and clang, then
+PlatformIO with its official installer, which puts <code>pio</code> in
+<code>~/.platformio/penv/bin</code>:</p>
+<pre><code>sudo apt install git python3 python3-venv clang curl   # Debian, Ubuntu
+# sudo dnf install git python3 clang curl              # Fedora
+
+curl -fsSLO https://raw.githubusercontent.com/platformio/platformio-core-installer/master/get-platformio.py
+python3 get-platformio.py
+echo 'export PATH="$PATH:$HOME/.platformio/penv/bin"' &gt;&gt; ~/.bashrc</code></pre>
+<p><code>pipx install platformio</code> also works. Linux won't let an
+ordinary user open the ST-Link or the board's USB serial port until you
+add PlatformIO's udev rules (which grant access to those devices) and
+join the serial group:</p>
+<pre><code>curl -fsSL https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/system/99-platformio-udev.rules \
+  | sudo tee /etc/udev/rules.d/99-platformio-udev.rules
+sudo udevadm control --reload-rules &amp;&amp; sudo udevadm trigger
+sudo usermod -a -G dialout,plugdev $USER   # Arch: uucp instead of dialout</code></pre>
+<p>Log out and back in for the groups to take effect.</p>
+
+<h4>Check it works</h4>
+<pre><code>git clone https://github.com/jonphilpott/buddhabox-framework.git
+git clone https://github.com/jonphilpott/partials.git   # optional: port tests
+cd buddhabox-framework
+pio run -e minimal             # the first build downloads the toolchain
+pio run -e minimal -t upload   # with an ST-Link wired up (step 4)
+pio device list                # the board's USB serial port</code></pre>
+<p>Clone <code>partials</code> next to <code>buddhabox-framework</code>:
+the port test looks for it at <code>../partials</code>.</p>
+
+<h3>2. Create a project</h3>
 <p>The quickest start is the project generator. It makes a folder with a
 <code>platformio.ini</code> linked to this checkout and a
 <code>src/main.cpp</code> copied from one of the examples:</p>
@@ -122,7 +166,7 @@ lib_deps =
 and GCC obeys the last <code>-O</code> it sees, so without it
 <code>-O2</code> is silently ignored and the DSP runs slower.</p>
 
-<h3>2. Write a patch</h3>
+<h3>3. Write a patch</h3>
 <p>Every program has three parts: DSP objects as globals, an
 <code>audioCallback()</code> that fills the DAC's buffer, and a
 <code>setup()</code> that starts the engine. This is
@@ -183,7 +227,7 @@ void loop() {
 }</code></pre>
 <!-- /INCLUDE -->
 
-<h3>3. Build and upload</h3>
+<h3>4. Build and upload</h3>
 <ol>
   <li><code>pio run</code> to build (it must compile cleanly before you
     flash).</li>

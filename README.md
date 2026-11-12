@@ -11,6 +11,63 @@ Every module processes one sample per `process()` call, works in floats
 normalised to ±1, and allocates nothing at run time: buffers are sized by
 template parameters, and lookup tables live in flash.
 
+## Set up the build environment
+
+You need git, Python 3 and [PlatformIO Core](https://platformio.org) (the
+`pio` command). The first build downloads everything else into
+`~/.platformio`: the ARM compiler, the STM32 Arduino core and the ST-Link
+upload tool, a few hundred MB in all.
+
+### macOS
+
+```sh
+xcode-select --install     # git and clang++ (for the host tests)
+brew install platformio    # from https://brew.sh
+```
+
+On macOS 26, the first time you plug in an ST-Link or a USB hub the system
+asks whether to allow it. Until you do, uploads fail.
+
+### Linux
+
+Install git, Python (with `venv`) and clang, then PlatformIO with its
+official installer:
+
+```sh
+sudo apt install git python3 python3-venv clang curl   # Debian, Ubuntu
+# sudo dnf install git python3 clang curl              # Fedora
+
+curl -fsSLO https://raw.githubusercontent.com/platformio/platformio-core-installer/master/get-platformio.py
+python3 get-platformio.py
+echo 'export PATH="$PATH:$HOME/.platformio/penv/bin"' >> ~/.bashrc
+```
+
+(`pipx install platformio` also works.) Linux won't let an ordinary user
+open the ST-Link or the board's USB serial port until you add
+PlatformIO's udev rules and join the serial group:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/system/99-platformio-udev.rules \
+  | sudo tee /etc/udev/rules.d/99-platformio-udev.rules
+sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo usermod -a -G dialout,plugdev $USER   # Arch: uucp instead of dialout
+```
+
+Log out and back in for the groups to take effect.
+
+### Check it works
+
+```sh
+git clone https://github.com/jonphilpott/buddhabox-framework.git
+git clone https://github.com/jonphilpott/partials.git   # optional: port tests
+cd buddhabox-framework
+pio run -e minimal             # the first build downloads the toolchain
+pio run -e minimal -t upload   # with an ST-Link wired up (see the guide)
+```
+
+`partials` must sit next to `buddhabox-framework`, because the port test
+looks for it at `../partials`.
+
 ## Use it in a project
 
 Create a new project from an example (default `minimal`):
