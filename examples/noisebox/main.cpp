@@ -21,7 +21,8 @@
  *                                 crush ─► echo ─► spring ─► out
  *
  * THE PANEL (one pot each):
- * - Pitch: 30 Hz to 1.4 kHz, smooth; the sequence plays on top of it.
+ * - Noise: white noise into the folder: grit at low settings, a roar
+ *   at high ones.
  * - Timbre: how hard the wavefolder folds: round sine to buzzy.
  * - FM: how far the mod osc swings the complex osc's pitch.
  * - Mod Rate: the mod osc. In Ratio mode, 0.25x to 8x the pitch (a
@@ -35,20 +36,21 @@
  * - Space: the spring.
  *
  * THE MENU (encoder; turn, press to edit, press to finish) also holds:
+ * - Pitch: chromatic, C1 to C6 (32.7 Hz to 1 kHz), shown as a note
+ *   name; the sequence plays on top of it, in the Colour's scale.
+ * - Colour: that scale, one of 16 five-note scales from dark to bright.
  * - Mod Wave: Triangle, Saw, Square or Noise (random steps at the mod
  *   rate: Free and fast is static, slow is a random wobble).
  * - Mod Track: Ratio or Free (see Mod Rate).
  * - Mod>Timbre: the mod osc moves the folding too (the Easel's
  *   "timbre modulation").
  * - Mod Mix: the mod osc's own signal, added before the gate.
- * - Noise: white noise into the folder: grit at low settings, a roar
- *   at high ones.
  * - Fold: Sine (smooth, bell-like) or Analog (rougher, vocal).
  * - Chaos, Chaos Rate: a Lorenz attractor wobbling Timbre and FM,
  *   from a slow drift to an audio-rate snarl.
  * - Crush: sample-rate reduction, 44 kHz down to about 700 Hz.
  * - Gate: Ping (each pulse strikes the gate) or Drone (always open).
- * - Steps, Colour: the sequence's length and its five-note scale.
+ * - Steps: the sequence's length.
  * - Echo Time, Echo Mix, Feedback: a delay with darkening repeats.
  * - Randomize: a new sequence.
  * Turning a pot sets its menu item, so the screen shows where it is; the
@@ -60,10 +62,14 @@
  * as in examples/easel, where it bought 14-16 dB on high notes.
  *
  * WHY THE SPRING RUNS AT HALF RATE: at the full rate it measured 31%
- * of the CPU in this patch. A real spring passes little above 5 kHz and
- * this model's loop low-pass stops at 6 kHz, so 22 kHz is plenty. Its
- * all-passes reach 2 samples back instead of 4, the same time, so the
- * chirp is unchanged.
+ * of the CPU in this patch. Its all-passes reach 2 samples back
+ * instead of 4, the same time, so the chirp falls in the same place.
+ * But it does not sound the same: it is crunchier. At 22 kHz nothing
+ * above 11 kHz fits, and the bright fold and noise above that, only
+ * partly removed by the averaging in the callback, folds back down to
+ * the wrong pitches inside the spring. Here that suits the patch. For
+ * a clean spring, low-pass the input properly first (two Svfs at
+ * 9 kHz, as the complex oscillator does) or run it at the full rate.
  *
  * Wiring:
  *   Audio    PB12 -> LRCLK/WSEL, PB13 -> BCLK, PB15 -> DIN (UDA1334A)
@@ -71,7 +77,7 @@
  *   Encoder  A -> PB6, B -> PB7, C (middle pin) -> GND
  *   Push     one leg -> PB5, the other -> GND
  *   Knobs    8 pots, outer legs to 3V3 and GND, wipers to:
- *              PA1 Pitch   PA2 Timbre   PA3 FM      PA4 Mod Rate
+ *              PA1 Noise   PA2 Timbre   PA3 FM      PA4 Mod Rate
  *              PA5 Rate    PA6 Decay    PA7 Random  PB0 Space
  *            Set kKnobs = false without them, or the unconnected pins'
  *            noise will move the settings.
@@ -83,6 +89,7 @@
 #include <Arduino.h>
 
 #include "buddhabox/core/dsp_common.h"
+#include "buddhabox/core/midi_utils.h"
 #include "buddhabox/core/random.h"
 #include "buddhabox/dynamics/vactrol_lpg.h"
 #include "buddhabox/engine/audio_engine.h"
@@ -110,10 +117,12 @@ const bool kKnobs = true; // pots on PA1-PA7 and PB0 (see Wiring)
 const int kMaxSteps = 8;  // the longest sequence
 
 // ── The menu ─────────────────────────────────────────────────────────
-// The first eight items are the pots, in panel order. The rest live in
-// the menu only.
+// Pitch and Colour first, since they're changed most from the menu;
+// then the eight pot items, in panel order; then the menu-only rest.
 enum Item {
   PITCH,
+  COLOUR,
+  NOISE,
   TIMBRE,
   FM,
   MOD_RATE,
@@ -125,14 +134,12 @@ enum Item {
   MOD_TRACK,
   MOD_TIMBRE,
   MOD_MIX,
-  NOISE,
   FOLD,
   CHAOS,
   CHAOS_RATE,
   CRUSH,
   GATE,
   STEPS,
-  COLOUR,
   ECHO_TIME,
   ECHO_MIX,
   FEEDBACK,
@@ -140,13 +147,23 @@ enum Item {
   kItems
 };
 
+// Pitch is a MIDI note, C1 to C6, shown by name. setup() writes the
+// names ("C1", "C#1" ... "C6") into noteText and points noteNames at
+// them, so the menu can show labels[value - min].
+const int kLowNote = NOTE_C1, kHighNote = NOTE_C6;
+const int kNotes = kHighNote - kLowNote + 1; // 61: five octaves
+char noteText[kNotes][4];
+const char *noteNames[kNotes];
+
 const char *const kModWaves[] = {"Triangle", "Saw", "Square", "Noise"};
 const char *const kTracks[] = {"Free", "Ratio"};
 const char *const kFolds[] = {"Sine", "Analog"};
 const char *const kGates[] = {"Drone", "Ping"};
 
 MenuItem items[kItems] = {
-    {"Pitch", 40, 0, 100, 1},
+    {"Pitch", NOTE_C3, kLowNote, kHighNote, 1, noteNames},
+    {"Colour", 6, 0, 15, 1},
+    {"Noise", 0, 0, 10, 2},
     {"Timbre", 30, 0, 100, 2},
     {"FM", 20, 0, 100, 2},
     {"Mod Rate", 50, 0, 100, 1},
@@ -158,14 +175,12 @@ MenuItem items[kItems] = {
     {"Mod Track", 1, 0, 1, 1, kTracks},
     {"Mod>Timbre", 0, 0, 100, 2},
     {"Mod Mix", 0, 0, 100, 2},
-    {"Noise", 0, 0, 100, 2},
     {"Fold", 0, 0, 1, 1, kFolds},
     {"Chaos", 0, 0, 100, 2},
     {"Chaos Rate", 40, 0, 100, 2},
     {"Crush", 0, 0, 100, 2},
     {"Gate", 1, 0, 1, 1, kGates},
     {"Steps", 5, 1, kMaxSteps, 1},
-    {"Colour", 6, 0, 15, 1},
     {"Echo Time", 25, 1, 37, 1, nullptr, "0ms"}, // tens of ms
     {"Echo Mix", 0, 0, 100, 2},
     {"Feedback", 40, 0, 95, 2},
@@ -187,13 +202,15 @@ float position(int i) {
 }
 
 // ── The knobs ────────────────────────────────────────────────────────
-// Pot n sets item n (the enum lists the pot items first). Light
-// smoothing: the hysteresis already stops the jitter.
+// Pot n sets menu item kKnobItems[n]. Light smoothing: the hysteresis
+// already stops the jitter.
 AnalogInput knobs[] = {AnalogInput(PA1, 0.7f), AnalogInput(PA2, 0.7f),
                        AnalogInput(PA3, 0.7f), AnalogInput(PA4, 0.7f),
                        AnalogInput(PA5, 0.7f), AnalogInput(PA6, 0.7f),
                        AnalogInput(PA7, 0.7f), AnalogInput(PB0, 0.7f)};
 const int kKnobCount = sizeof(knobs) / sizeof(knobs[0]);
+const Item kKnobItems[kKnobCount] = {NOISE, TIMBRE, FM,     MOD_RATE,
+                                     RATE,  DECAY,  ECHO_MIX, SPACE};
 
 // ── Modules ──────────────────────────────────────────────────────────
 Pulser pulser;
@@ -209,7 +226,8 @@ Decimator crush;
 // 16384 samples (0.37 s) of 16-bit storage: 32 KB.
 DelayLine<16384> echo;
 // The spring runs at half rate (see the file header): 1024 samples
-// hold its longer trip there, and a stretch of 2 keeps its chirp. 8 KB.
+// hold its longer trip there, and a stretch of 2 keeps its chirp in
+// place. Crunchier than the full-rate spring: see the header. 8 KB.
 SpringReverb<1024, 2> spring;
 float springPrevL = 0.0f, springPrevR = 0.0f; // its last two outputs
 float springNowL = 0.0f, springNowR = 0.0f;
@@ -269,7 +287,9 @@ void randomize() {
 void applyMenu() {
   // 1. The panel. Exponential where the ear hears ratios (pitch, rates),
   //    linear where it hears amounts.
-  baseHz = 30.0f * fastExp2(5.5f * position(PITCH)); // 30 Hz - 1.36 kHz
+  // Pitch (menu only): a whole note, so it always lands on a semitone.
+  baseHz = midiToFreq((uint8_t)items[PITCH].value); // powf: control rate
+  noiseAmount = position(NOISE);
   timbre = position(TIMBRE);
   fmDepth = 0.95f * position(FM); // under 1: the pitch never goes negative
   modRatio = 0.25f * fastExp2(5.0f * position(MOD_RATE));     // 0.25x - 8x
@@ -289,7 +309,6 @@ void applyMenu() {
   modTrack = items[MOD_TRACK].value;
   modTimbre = 0.5f * position(MOD_TIMBRE);
   modMix = 0.6f * position(MOD_MIX);
-  noiseAmount = position(NOISE);
   analogFold = items[FOLD].value;
   chaosAmount = position(CHAOS);
   chaos.setRate(0.3f + 0.7f * position(CHAOS_RATE)); // drift to snarl
@@ -392,10 +411,10 @@ void audioCallback(int16_t *buffer, uint16_t length) {
     x += echoMix * wet;
 
     // 7. The spring, at half rate. Each odd sample feeds it the
-    //    average of the last two inputs (a gentle low-pass, so less
-    //    folds back) and takes a new pair out. The output between is
-    //    a straight line through the last two: the midpoint on even
-    //    samples, the newest on odd ones.
+    //    average of the last two inputs (a weak low-pass: some of the
+    //    treble still folds back, hence the crunch) and takes a new pair out.
+    //    The output between is a straight line through the last two: the
+    //    midpoint on even samples, the newest on odd ones.
     x *= 0.7f;
     if (oddSample) {
       springPrevL = springNowL;
@@ -463,6 +482,15 @@ void setup() {
   spring.setTime(0.7f);
   spring.setTone(0.45f);
   colour.setRoot(1.0f); // so getNote() returns a ratio over Pitch
+  static const char *const kNames[12] = {"C",  "C#", "D",  "D#", "E",  "F",
+                                         "F#", "G",  "G#", "A",  "A#", "B"};
+  for (int n = 0; n < kNotes; n++) {
+    int midi = kLowNote + n;
+    // MIDI 24 is C1: octave = note / 12 - 1.
+    snprintf(noteText[n], sizeof(noteText[n]), "%s%d", kNames[midi % 12],
+             midi / 12 - 1);
+    noteNames[n] = noteText[n];
+  }
   for (int i = 0; i < kItems; i++)
     fine[i] = -1.0f;
   randomize();
@@ -487,9 +515,10 @@ void loop() {
     if (v == last[k])
       continue;
     last[k] = v;
-    MenuItem &m = items[k];
+    int item = kKnobItems[k];
+    MenuItem &m = items[item];
     m.value = m.min + (int)(v * (m.max - m.min) + 0.5f);
-    fine[k] = v;
+    fine[item] = v;
     moved = true;
   }
   if (moved)

@@ -24,7 +24,8 @@
  *    in a long enough chain a click spreads out into a chirp. Each one is
  *    "stretched" (it uses the sample 4 back, not 1 back), which moves
  *    the chirp into the spring's range, below about 5.5 kHz. At half
- *    rate, 2 back is the same time (see STRETCH below).
+ *    rate, 2 back is the same time (see STRETCH below), though the
+ *    tank sounds crunchier there.
  * 3. Delay: the time for one trip along the spring, 35 to 42 ms.
  * 4. Low-pass and feedback: each trip loses some treble and some level,
  *    so echoes get darker and quieter. The low-pass also removes the
@@ -53,7 +54,7 @@ namespace bb {
  *                  smallest that works at the full rate
  * @tparam STRETCH  How many samples back each all-pass reaches (a power
  *                  of two). 4 at 44.1 kHz; 2 at half rate, which delays
- *                  by the same time and so keeps the same chirp
+ *                  by the same time, so the chirp stays in place
  *
  * Example — on a voice's output:
  *   SpringReverb<> spring;
@@ -68,6 +69,10 @@ namespace bb {
  *   SpringReverb<1024, 2> spring; // 8 KB
  *   spring.init(SAMPLE_RATE / 2);
  *   // call process() on every second sample, fill the gaps in between
+ *
+ * Half rate is not free: it sounds crunchier. Treble above 11 kHz in
+ * the input folds back down to the wrong pitches inside the tank unless
+ * the input is low-passed well below that first.
  */
 template <uint16_t SIZE = 2048, int STRETCH = 4> class SpringReverb {
 public:

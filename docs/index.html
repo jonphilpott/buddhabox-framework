@@ -1053,14 +1053,15 @@ rather than a self-playing patch. A pulser steps a random sequence of
 oscillator (a sine, frequency-modulated by a second oscillator, plus
 white noise, wavefolded at twice the sample rate), and after the gate
 come a sample-rate crusher, an echo and the spring. The eight pots
-are the panel: Pitch on PA1, Timbre PA2, FM PA3, Mod Rate PA4, Rate
+are the panel: Noise on PA1, Timbre PA2, FM PA3, Mod Rate PA4, Rate
 (the pulser, 4&nbsp;s to 30&nbsp;ms) PA5, Decay PA6, Random PA7 and
 Space (the spring) PB0. Random is the chance that each pulse rewrites
 the step about to play: at 0 the loop repeats forever, at full every
 note is new. The menu holds the routing: the mod oscillator's wave
 (triangle, saw, square or stepped noise), whether it follows the
 pitch as a ratio or runs free from 0.05&nbsp;Hz to 2&nbsp;kHz, how
-much it moves the folding, its own level, the noise, a sine or analog
+much it moves the folding, its own level, the pitch (chromatic, C1
+to C6, shown by note name: the root of the sequence's scale), a sine or analog
 fold curve, a Lorenz attractor wobbling Timbre and FM, the crusher,
 Ping or Drone for the gate, the sequence's length and scale, and the
 echo. Wiring as for <code>acid</code>.</p>
@@ -1068,7 +1069,13 @@ echo. Wiring as for <code>acid</code>.</p>
 straight-line interpolation as for <code>acid</code>'s drums. A
 real spring passes little above 5&nbsp;kHz, and
 <code>SpringReverb&lt;1024, 2&gt;</code> reaches 2 samples back where
-the full-rate tank reaches 4: the same time, so the same chirp. The
+the full-rate tank reaches 4: the same time, so the chirp stays in
+place. It does sound crunchier, though. Nothing above 11&nbsp;kHz fits
+at half rate, and averaging pairs of samples on the way in removes only
+part of the bright fold and noise above that; the rest folds back down
+to the wrong pitches inside the spring. That suits this patch. For a
+clean spring, low-pass the input properly first, or run it at the full
+rate. The
 crusher is skipped at 0, since it cost about 5% even when passing
 the sound straight through. The patch measured 71&ndash;74% of the CPU
 on the board whatever the settings, with <code>loop()</code> running
