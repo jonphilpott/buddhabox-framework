@@ -36,7 +36,8 @@
  * THE SEQUENCE: notes come from a Colour, a five-note just scale with
  * 16 flavours from dark to bright (mod/colour.h). Randomize rolls a new
  * 16-step melody over two octaves, plus random accents, slides, rests
- * and octave jumps. Changing Colour keeps the melody and re-tunes it.
+ * and octave jumps. Changing Colour keeps the melody and re-tunes it;
+ * so does Root, the bottom note of the scale (C1 to C3, A1 at first).
  * Random is the noisebox's "Turing machine": on each step, the chance
  * of rewriting the step about to play (its note, accent, slide and
  * rest). At 0 the bar repeats forever; at 100 every step is new.
@@ -68,6 +69,7 @@
 #include <Arduino.h>
 
 #include "buddhabox/core/dsp_common.h"
+#include "buddhabox/core/midi_utils.h"
 #include "buddhabox/core/random.h"
 #include "buddhabox/engine/audio_engine.h"
 #include "buddhabox/filter/moog_filter.h"
@@ -89,7 +91,6 @@
 using namespace bb;
 
 // ── Settings ─────────────────────────────────────────────────────────
-const float kRoot = 55.0f;         // A1: the bottom note of the sequence
 const int kSteps = 16;             // one bar of sixteenth notes
 const float kGlideSeconds = 0.06f; // a 303 slide takes about 60 ms
 const bool kKnobs = true;          // pots on PA1-PA7 and PB0 (see Wiring)
@@ -108,6 +109,7 @@ enum Item {
   DRIVE,
   WAVE,
   FILTER,
+  ROOT,
   COLOUR,
   RANDOM,
   CHAOS,
@@ -123,6 +125,14 @@ enum Item {
 const char *const kWaves[] = {"Saw", "Square"};
 const char *const kFilters[] = {"Ladder", "MS-20"};
 
+// Root is a MIDI note, C1 to C3: two octaves of bass, shown by name.
+// setup() writes the names ("C1", "C#1" ... "C3") into noteText and
+// points noteNames at them, so the menu can show labels[value - min].
+const int kLowNote = NOTE_C1, kHighNote = NOTE_C3;
+const int kNotes = kHighNote - kLowNote + 1; // 25
+char noteText[kNotes][4];
+const char *noteNames[kNotes];
+
 MenuItem items[kItems] = {
     {"Tempo", 125, 60, 200, 1},
     {"Cutoff", 30, 0, 100, 2},
@@ -133,6 +143,7 @@ MenuItem items[kItems] = {
     {"Drive", 30, 0, 100, 2},
     {"Wave", 0, 0, 1, 1, kWaves},
     {"Filter", 1, 0, 1, 1, kFilters},
+    {"Root", NOTE_C1 + 9, kLowNote, kHighNote, 1, noteNames}, // A1, 55 Hz
     {"Colour", 6, 0, 15, 1},
     {"Random", 0, 0, 100, 2},
     {"Chaos", 0, 0, 100, 2},
@@ -217,8 +228,8 @@ float randomChance = 0.0f; // Random, 0-1
 volatile int step = kSteps - 1; // so the first tick plays step 0
 uint32_t gateSamples = 0;       // samples left until the gate closes
 bool accentNow = false;         // is the sounding note accented?
-float pitchHz = kRoot;          // where the oscillator is now...
-float targetHz = kRoot;         // ...and where it's heading
+float pitchHz = 55.0f;          // where the oscillator is now...
+float targetHz = 55.0f;         // ...and where it's heading
 float glideCoefficient = 0.0f;
 float echoSamples = 0.0f; // the delay time, from Tempo and Delay Time
 float echoMix = 0.0f, echoFeedback = 0.0f;
@@ -278,6 +289,9 @@ void applyMenu() {
   osc.setShape(items[WAVE].value ? BasicOscillator::SQUARE
                                  : BasicOscillator::SAW);
   colour.setColour(COLOUR_BY_BRIGHTNESS[items[COLOUR].value]);
+  // Root: a whole MIDI note, so it always lands on a semitone. The
+  // next note played picks it up.
+  colour.setRoot(midiToFreq((uint8_t)items[ROOT].value)); // control rate
   // Echo: a number of sixteenth notes at the current tempo.
   float sixteenth = SAMPLE_RATE * 60.0f / (items[TEMPO].value * 4.0f);
   echoSamples = minf(sixteenth * items[DELAY_TIME].value, 32766.0f);
@@ -446,7 +460,15 @@ void setup() {
   spring.setTone(0.5f);
   chaos.init(SAMPLE_RATE / kFilterEvery); // see the Lorenz's note
   glideCoefficient = 1.0f - expf(-3.0f / (kGlideSeconds * SAMPLE_RATE));
-  colour.setRoot(kRoot);
+  static const char *const kNames[12] = {"C",  "C#", "D",  "D#", "E",  "F",
+                                         "F#", "G",  "G#", "A",  "A#", "B"};
+  for (int n = 0; n < kNotes; n++) {
+    int midi = kLowNote + n;
+    // MIDI 24 is C1: octave = note / 12 - 1.
+    snprintf(noteText[n], sizeof(noteText[n]), "%s%d", kNames[midi % 12],
+             midi / 12 - 1);
+    noteNames[n] = noteText[n];
+  }
   applyMenu();
   randomize();
 
