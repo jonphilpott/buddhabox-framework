@@ -59,9 +59,13 @@
  *   OLED     VCC -> 3V3, GND -> GND, SCL -> PB8, SDA -> PB9
  *   Encoder  A -> PB6, B -> PB7, C (middle pin) -> GND
  *   Push     one leg -> PB5, the other -> GND
- *   Knob     (optional) pot: outer legs to 3V3 and GND, wiper to PA1.
- *            Sets the cutoff; set kCutoffKnob = false without one, or
- *            the unconnected pin's noise will move the filter.
+ *   Knobs    (optional) 8 pots, each with its outer legs to 3V3 and
+ *            GND and its wiper to a pin (10k or 100k both work):
+ *              PA1 Cutoff     PA2 Resonance   PA3 Env Mod   PA4 Decay
+ *              PA5 Accent     PA6 Drive       PA7 Tempo     PB0 Delay Mix
+ *            Set kKnobs = false without them, or the unconnected pins'
+ *            noise will move the settings. (PA0 is skipped: the board's
+ *            KEY button is on it.)
  *
  * Cost: 72% of the F411's CPU, measured on the board: 56% without the
  * drums (the spring alone is about 21%). 89 KB of RAM, 64 KB of it the
@@ -96,7 +100,7 @@ using namespace bb;
 const float kRoot = 55.0f;         // A1: the bottom note of the sequence
 const int kSteps = 16;             // one bar of sixteenth notes
 const float kGlideSeconds = 0.06f; // a 303 slide takes about 60 ms
-const bool kCutoffKnob = true;     // a pot on PA1 sets the cutoff
+const bool kKnobs = true;          // pots on PA1-PA7 and PB0 (see Wiring)
 const int kFilterEvery = 8;        // samples between cutoff updates (see below)
 
 // ── The menu ─────────────────────────────────────────────────────────
@@ -146,6 +150,24 @@ MenuItem items[kItems] = {
 };
 Menu menu(items, kItems);
 
+// ── The knobs ────────────────────────────────────────────────────────
+// Each pot drives one menu item: the table is all there is to change
+// to move a setting to another pot. Light smoothing (alpha 0.7): the
+// hysteresis already stops the jitter, so heavier smoothing would only
+// make the knobs lag.
+struct Knob {
+  AnalogInput input;
+  int item;           // which menu item it sets
+  float last = -1.0f; // its last reading; -1 = never read
+};
+
+Knob knobs[] = {
+    {AnalogInput(PA1, 0.7f), CUTOFF},  {AnalogInput(PA2, 0.7f), RESONANCE},
+    {AnalogInput(PA3, 0.7f), ENV_MOD}, {AnalogInput(PA4, 0.7f), DECAY},
+    {AnalogInput(PA5, 0.7f), ACCENT},  {AnalogInput(PA6, 0.7f), DRIVE},
+    {AnalogInput(PA7, 0.7f), TEMPO},   {AnalogInput(PB0, 0.7f), DELAY_MIX},
+};
+
 // ── Modules ──────────────────────────────────────────────────────────
 BasicOscillator osc;
 MoogFilter ladder;
@@ -170,7 +192,6 @@ Colour colour;
 LFSR rng(303);
 
 EncoderInput encoder;
-AnalogInput cutoffKnob(PA1, 0.3f); // quick: it's for wiggling
 SwitchInput push(PB5);
 Oled oled;
 bool haveScreen = false;
@@ -187,6 +208,10 @@ bool accents[kSteps], slides[kSteps], rests[kSteps];
 // Floats are written in one instruction too, so the same goes for
 // these: loop() writes them, the audio interrupt reads them.
 float cutoffSemis = 0.0f; // the knob's base cutoff, semitones over 40 Hz
+// The cutoff pot's exact position, 0-1, or -1 when the menu set the
+// cutoff last. Finer than the menu's 0-100 steps, so a slow turn sweeps
+// smoothly instead of in 0.72-semitone jumps.
+float cutoffFine = -1.0f;
 float envModSemis = 0.0f; // how far the envelope opens it
 float accentAmount = 0.0f;
 float resonance = 0.0f;
@@ -230,7 +255,8 @@ void applyMenu() {
   tempo.setBPM((float)items[TEMPO].value);
   // Cutoff: 40 Hz to about 2.6 kHz over the knob (six octaves), before
   // the envelope adds its sweep on top.
-  cutoffSemis = 0.72f * items[CUTOFF].value;
+  cutoffSemis =
+      cutoffFine >= 0.0f ? 72.0f * cutoffFine : 0.72f * items[CUTOFF].value;
   // Env Mod: up to four more octaves at the envelope's peak.
   envModSemis = 0.48f * items[ENV_MOD].value;
   // Resonance stops short of 1.0, where both filters ring on their own.
@@ -438,29 +464,36 @@ void setup() {
 }
 
 void loop() {
-  // 1. Cutoff knob. Only a real move gets through its hysteresis, and
-  //    then it takes over from the menu: the Cutoff item is set to
-  //    match, so the screen shows where the knob is. The cutoff itself
-  //    comes straight from the knob's reading, finer than the menu's
-  //    whole-number steps, so a slow turn sweeps smoothly.
-  if (kCutoffKnob) {
-    static float lastKnob = -1.0f;
-    cutoffKnob.update();
-    float k = cutoffKnob.read();
-    if (k != lastKnob) {
-      lastKnob = k;
-      items[CUTOFF].value = (int)(k * 100.0f + 0.5f);
-      applyMenu();
-      cutoffSemis = 72.0f * k;
+  // 1. Knobs. Only a real move gets through a knob's hysteresis, and
+  //    then it sets its menu item, so the screen shows where it is.
+  //    At power-up every knob counts as moved: the panel wins over the
+  //    menu's defaults.
+  if (kKnobs) {
+    bool moved = false;
+    for (Knob &k : knobs) {
+      k.input.update();
+      float v = k.input.read();
+      if (v == k.last)
+        continue;
+      k.last = v;
+      MenuItem &m = items[k.item];
+      m.value = m.min + (int)(v * (m.max - m.min) + 0.5f);
+      if (k.item == CUTOFF)
+        cutoffFine = v;
+      moved = true;
     }
+    if (moved)
+      applyMenu();
   }
 
   // 2. Menu: hand it the encoder and the switch; it says what changed.
   push.update();
   Menu::Event event = menu.update(encoder.delta(), push.triggered());
-  if (event == Menu::CHANGED)
+  if (event == Menu::CHANGED) {
+    if (menu.selected() == CUTOFF)
+      cutoffFine = -1.0f; // the menu has the cutoff now
     applyMenu();
-  else if (event == Menu::ACTION && menu.selected() == RANDOMIZE)
+  } else if (event == Menu::ACTION && menu.selected() == RANDOMIZE)
     randomize();
 
   // 3. CPU load over USB serial once a second (pio device monitor).
@@ -472,11 +505,15 @@ void loop() {
     Serial.println("%");
   }
 
-  // 4. Display at 20 frames a second.
+  // 4. Display: redraw at 20 frames a second, but send only one page
+  //    (8 rows) per loop(). A whole screen blocks loop() for about
+  //    100 ms with the audio this busy, and the knobs would lag;
+  //    one page takes a few ms, and the knobs are read in between.
   static uint32_t lastFrame = 0;
   if (haveScreen && millis() - lastFrame >= 50) {
     lastFrame = millis();
     drawScreen();
-    oled.display();
   }
+  if (haveScreen)
+    oled.display(1);
 }

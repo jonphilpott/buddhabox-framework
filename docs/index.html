@@ -370,7 +370,12 @@ lines. I2C is slow, about 27 ms for a whole screen, so
 <code>display()</code> sends only the 8-pixel strips that changed. Redraw
 from <code>loop()</code> 10 to 20 times a second, never from the audio
 callback. Audio is unaffected while it sends; <code>loop()</code>
-waits.</p>
+waits, and with a busy patch the wait stretches: in <code>acid</code>
+a whole screen held <code>loop()</code> for 110 ms, so the knobs were
+read only 10 times a second. <code>display(1)</code> sends one strip
+and returns. Call it on every <code>loop()</code>, redraw at 20 frames
+a second as before, and the knobs are read between strips:
+<code>acid</code> went to 63 times a second, at most 23 ms apart.</p>
 
 <h4>A settings menu</h4>
 <p>With an OLED and a rotary encoder, <code>Menu</code>
@@ -1023,10 +1028,17 @@ Drive, Wave, Filter, Colour, Delay Time, Delay Mix, Feedback, Reverb
 and Randomize, which rolls a new sequence.
 Filter switches between <code>Ms20Filter</code>, whose resonance keeps
 the bass, and the Moog ladder, whose bass thins as resonance rises.
+The MS-20 turns its input down to a quarter inside the loop, so its
+clipper leaves room for the resonance to build from a full-scale saw,
+then turns the output back up; its peaks (about &plusmn;2.5) go on into
+the overdrive and the final soft clip.
 The voice then goes through a tempo-synced echo, 3/16 by default, whose
 repeats darken as they fade, and the spring reverb. Wiring as for
-<code>oled</code>; the optional pot on PA1 sets the cutoff (set
-<code>kCutoffKnob</code> to <code>false</code> without one). A kick on
+<code>oled</code>, plus eight optional pots: Cutoff on PA1, Resonance
+PA2, Env Mod PA3, Decay PA4, Accent PA5, Drive PA6, Tempo PA7 and Delay
+Mix PB0. Turning one sets its menu item, so the screen always shows
+where the knobs are. Set <code>kKnobs</code> to <code>false</code>
+without them. A kick on
 the beat and a snare on 2
 and 4 play underneath, dry; Drums sets their level. Both run at half
 the sample rate, which roughly halves their cost. The whole patch uses

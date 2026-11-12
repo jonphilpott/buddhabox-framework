@@ -483,10 +483,20 @@ public:
   }
 
   /**
-   * Send every page drawn on since the last display() to the screen.
+   * Send the pages drawn on since the last display() to the screen.
    *
    * Blocks while I2C runs: about 3.4 ms per changed page, 27 ms for a
-   * full screen. Call it from loop() only, at 10 to 20 frames a second.
+   * full screen, and longer while the audio is busy. Call it from
+   * loop() only, at 10 to 20 frames a second.
+   *
+   * WHY maxPages: loop() can't read knobs while it waits here. With a
+   * heavy patch a full screen can hold it up for 100 ms, and the knobs
+   * lag. display(1) sends just one changed page and returns; call it
+   * on every loop() and the rest follow on the next calls, with the
+   * knobs read in between.
+   *
+   * @param maxPages  Most pages to send this call, 1 to 8 (default:
+   *                  all of them)
    *
    * Example:
    *   if (millis() - last >= 50) {   // 20 frames a second
@@ -494,11 +504,26 @@ public:
    *     drawScreen();
    *     oled.display();
    *   }
+   *
+   * Example — a heavy patch, keeping loop() quick:
+   *   if (millis() - last >= 50) {
+   *     last = millis();
+   *     drawScreen();
+   *   }
+   *   oled.display(1); // every loop(): one page at a time
    */
-  void display() {
-    for (int page = 0; page < PAGES; page++) {
+  void display(int maxPages = PAGES) {
+    // Look at each page once, starting after the last one sent. Always
+    // starting from page 0 would starve the bottom of the screen: a
+    // redraw marks every page dirty again before display(1) gets that
+    // far, so pages 0..3 would be sent forever and 4..7 never.
+    for (int i = 0; i < PAGES && maxPages > 0; i++) {
+      int page = (nextPage_ + i) % PAGES;
       if (!(dirty_ & (1 << page)))
         continue;
+      nextPage_ = (page + 1) % PAGES; // the next call starts after this
+      dirty_ &= ~(1 << page);         // sent: clean until drawn on again
+      maxPages--;
       // Point the display at the start of this page: the page number,
       // then the column split into two 4-bit commands. The SH1106 has
       // 132 columns of RAM for a 128-pixel panel, centred, so its
@@ -519,7 +544,6 @@ public:
         Wire.endTransmission();
       }
     }
-    dirty_ = 0;
   }
 
 private:
@@ -534,6 +558,7 @@ private:
   bool sh1106_;
   uint8_t address_;
   uint8_t dirty_;             // bit n set = page n changed
+  int nextPage_ = 0;          // where display() looks first
   uint8_t buf_[PAGES][WIDTH]; // the frame buffer, 1 KB
 };
 

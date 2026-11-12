@@ -1177,11 +1177,13 @@ float out = filter.process(saw);</code></pre>
 <p>The Korg MS-20&#x27;s filter (the &quot;Korg35&quot;): 12 dB per octave.</p>
 <p>WHY NOT THE MOOG LADDER? A ladder&#x27;s resonance feeds the output back to the input upside down. At the resonant peak that adds up, but at low frequencies it subtracts: turning resonance up thins the bass, down to a quarter of the level at full resonance.</p>
 <p>The MS-20 takes its feedback through a high-pass filter first. Bass never reaches the feedback path, so it passes at full level however high the resonance goes. Only the band around the cutoff is boosted. A diode clipper in the loop keeps the resonance from running away, so at high settings it growls and screams rather than whistling cleanly.</p>
+<h5>Headroom</h5>
+<p>the clipper only leaves room for the resonance if the input is quiet, so process() turns the input down to a quarter and the output back up 4x. Bass comes out at the level it went in, but a screaming peak reaches about +-2.5 (a full-scale saw at full resonance): tame it after the filter.</p>
 <p>HOW THIS MODEL WORKS (after Will Pirkle&#x27;s &quot;Virtual Analog Korg35&quot; application note, built on Vadim Zavalishin&#x27;s zero-delay-feedback filters):</p>
 <p>in ─► low-pass 1 ─► (+) ─► clip ─► low-pass 2 ─┬─► out ▲                         │ └── high-pass ◄── x K ◄───┘</p>
 <p>Each block is a one-pole filter. Feedback in a digital filter usually needs a one-sample delay, which detunes the cutoff and makes high resonance unstable. The &quot;zero-delay feedback&quot; (ZDF) method solves the loop&#x27;s equation for the current sample instead: alpha0_ below is that solution. The filter stays in tune and stable while the cutoff sweeps.</p>
 <h5>Cost</h5>
-<p>72 cycles a sample on the F411 (3.3% of the budget; the Moog ladder is 44), 40 bytes. setFrequency() calls tanf() and costs 233 cycles: call it at control rate, or every few samples for an envelope sweep (examples/acid does every 8th, 29 cycles a sample).</p>
+<p>about 72 cycles a sample on the F411 (3.3% of the budget; the Moog ladder is 44), 40 bytes. setFrequency() calls tanf() and costs 233 cycles: call it at control rate, or every few samples for an envelope sweep (examples/acid does every 8th, 29 cycles a sample).</p>
 <div class="module-card" id="ms20filter">
 <h4>Ms20Filter</h4>
 <div class="method-sig">class Ms20Filter</div>
@@ -1207,7 +1209,7 @@ float out = filter.process(saw.process());</code></pre>
 <p class="example-label">Example:</p>
 <pre><code>float out = filter.process(in);</code></pre>
 <div class="method-param">Param <code>in</code> — Input, about -1.0 to 1.0</div>
-<div class="method-returns">Returns: Low-passed output; bass keeps its level at any resonance</div></div></div>
+<div class="method-returns">Returns: Low-passed output; bass keeps its level at any resonance, and resonant peaks reach about +-2.5, so follow it with something that tames them (softLimitClip(), Overdrive)</div></div></div>
 <div class="method-block"><div class="method-sig">void clear()</div><div class="method-desc"><p>Clear the filter&#x27;s memory (silence, no ringing).</p></div></div>
 </div>
 <h3 id="one-pole-h">one_pole.h</h3>
@@ -4160,14 +4162,22 @@ oled.number(0, 8, -12.0f, 0);     // &quot;-12&quot;</code></pre>
 <div class="method-param">Param <code>decimals</code> — Digits after the point, 0 to 4.</div>
 <div class="method-param">Param <code>on</code> — As text().</div>
 <div class="method-returns">Returns: The x just after the last character.</div></div></div>
-<div class="method-block"><div class="method-sig">void display()</div><div class="method-desc"><p>Send every page drawn on since the last display() to the screen.</p>
-<p>Blocks while I2C runs: about 3.4 ms per changed page, 27 ms for a full screen. Call it from loop() only, at 10 to 20 frames a second.</p>
+<div class="method-block"><div class="method-sig">void display(int maxPages = PAGES)</div><div class="method-desc"><p>Send the pages drawn on since the last display() to the screen.</p>
+<p>Blocks while I2C runs: about 3.4 ms per changed page, 27 ms for a full screen, and longer while the audio is busy. Call it from loop() only, at 10 to 20 frames a second.</p>
+<p>WHY maxPages: loop() can&#x27;t read knobs while it waits here. With a heavy patch a full screen can hold it up for 100 ms, and the knobs lag. display(1) sends just one changed page and returns; call it on every loop() and the rest follow on the next calls, with the knobs read in between.</p>
 <p class="example-label">Example:</p>
 <pre><code>if (millis() - last &gt;= 50) {   // 20 frames a second
   last = millis();
   drawScreen();
   oled.display();
-}</code></pre></div></div>
+}</code></pre>
+<p class="example-label">Example — a heavy patch, keeping loop() quick:</p>
+<pre><code>if (millis() - last &gt;= 50) {
+  last = millis();
+  drawScreen();
+}
+oled.display(1); // every loop(): one page at a time</code></pre>
+<div class="method-param">Param <code>maxPages</code> — Most pages to send this call, 1 to 8 (default: all of them)</div></div></div>
 </div>
 <h3 id="switch-input-h">switch_input.h</h3>
 <p class="include"><code>#include "buddhabox/io/switch_input.h"</code> — Debounced digital switch input with trigger/hold/release detection.</p>

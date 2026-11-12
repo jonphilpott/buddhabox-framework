@@ -15,6 +15,12 @@
  * A diode clipper in the loop keeps the resonance from running away, so
  * at high settings it growls and screams rather than whistling cleanly.
  *
+ * HEADROOM: the clipper only leaves room for the resonance if the input
+ * is quiet, so process() turns the input down to a quarter and the
+ * output back up 4x. Bass comes out at the level it went in, but a
+ * screaming peak reaches about +-2.5 (a full-scale saw at full resonance):
+ * tame it after the filter.
+ *
  * HOW THIS MODEL WORKS (after Will Pirkle's "Virtual Analog Korg35"
  * application note, built on Vadim Zavalishin's zero-delay-feedback
  * filters):
@@ -29,7 +35,7 @@
  * loop's equation for the current sample instead: alpha0_ below is that
  * solution. The filter stays in tune and stable while the cutoff sweeps.
  *
- * COST: 72 cycles a sample on the F411 (3.3% of the budget; the Moog
+ * COST: about 72 cycles a sample on the F411 (3.3% of the budget; the Moog
  * ladder is 44), 40 bytes. setFrequency() calls tanf() and costs 233
  * cycles: call it at control rate, or every few samples for an
  * envelope sweep (examples/acid does every 8th, 29 cycles a sample).
@@ -105,12 +111,21 @@ public:
    * Filter one sample.
    *
    * @param in  Input, about -1.0 to 1.0
-   * @return    Low-passed output; bass keeps its level at any resonance
+   * @return    Low-passed output; bass keeps its level at any resonance,
+   *            and resonant peaks reach about +-2.5, so follow it with
+   *            something that tames them (softLimitClip(), Overdrive)
    *
    * Example:
    *   float out = filter.process(in);
    */
   float process(float in) {
+    // 0. Headroom. The clipper in step 3 limits the loop to about +-1, so
+    //    a full-scale input would fill it and leave the resonance no
+    //    room: measured with a +-1 saw, full resonance added only 3.5 dB
+    //    at the cutoff. A quarter of the level leaves 12 dB for the peak
+    //    (28 dB of boost measured), and step 6 turns it back up.
+    in *= kHeadroom;
+
     // 1. First low-pass (a zero-delay one-pole: v is the step towards
     //    the input, state z holds what the integrator remembers).
     float v = (in - z1_) * a_;
@@ -134,13 +149,17 @@ public:
     //    needed (it is fed back through hpBeta_ next sample).
     v = (k_ * out - z3_) * a_;
     z3_ = v + z3_ + v;
-    return out;
+
+    // 6. Undo step 0: bass comes out at the level it went in.
+    return out * (1.0f / kHeadroom);
   }
 
   /** Clear the filter's memory (silence, no ringing). */
   void clear() { z1_ = z2_ = z3_ = 0.0f; }
 
 private:
+  static constexpr float kHeadroom = 0.25f; // input level inside the loop
+
   /** Recompute the loop's coefficients from g_ and k_. */
   void update() {
     // a: each one-pole's gain, G = g / (1 + g).
