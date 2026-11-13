@@ -139,8 +139,24 @@ void loop() {}
 - `python3 tools/gen_modules.py` — refresh the module list the editor and
   generator use
 
-## Licence
+## Credits and licence
 
-MIT. Modules derived from Mutable Instruments firmware and stmlib are
-Copyright (c) 2012-2023 Emilie Gillet; see `LICENSE`.
+Many of the modules are ports of code from
+[Mutable Instruments](https://mutable-instruments.net)' Eurorack
+firmware and its stmlib library, by Emilie Gillet: oscillators,
+resonators, reverbs, filters, envelopes and drums from Plaits, Rings,
+Elements, Clouds, Peaks, Streams, Tides and Warps, among others. They
+came through the [Partials](https://github.com/jonphilpott/partials)
+library, and a ported file's header comment names the module it came
+from. Any mistakes made in porting are ours, not Mutable Instruments'.
+
+That code is Copyright (c) 2012-2023 Emilie Gillet and released under
+the MIT licence. The full notice is in `LICENSE.mutable`, and it must be
+kept with any copy of this code or substantial part of it.
+
+The rest of the framework is Copyright (c) 2026 Jon Philpott, also under
+the MIT licence: see `LICENSE`.
+
+The original firmware is at
+[github.com/pichenettes/eurorack](https://github.com/pichenettes/eurorack).
 # buddhabox-framework
