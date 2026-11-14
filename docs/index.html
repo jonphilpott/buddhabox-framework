@@ -1215,6 +1215,45 @@ more aliasing on high, bright notes. The five starting presets measured
 70&ndash;76%, with <code>loop()</code> running 51&ndash;65 times a
 second; 51&nbsp;KB of RAM.</p>
 
+<h3>drone</h3>
+<p>A five-voice drone that never quite repeats. Five
+<code>BasicOscillator</code>s play a chord over a root note, with pink
+noise, through a Moog or MS-20 low-pass, an echo and a reverb. A
+<code>Lorenz</code> attractor drifts each oscillator's pitch and level,
+the noise and the cutoff. Detune is in Hz, not cents, so every
+oscillator beats at about the same rate whatever its note.</p>
+<p>Each oscillator plays the root times a ratio, and Chord picks the
+ratios: Fifths (root, fifth, octave, sub-octave and twelfth), Octaves,
+Fourths, Major, Minor, Harmonics, or Colour. Colour keeps the root,
+fifth and sub, and takes the other two notes from a <code>Colour</code>
+scale, so the Colour item gives 16 just-intonation chords from dark to
+bright. Voices (1 to 5) thins the chord in an order that keeps its shape
+(root, fifth, sub, then the upper two), turning the rest up to keep the
+level; silent oscillators aren't computed, saving about 4% of the CPU
+each. Root runs from C1 to C5 by note name, and Fine tunes it &plusmn;50
+cents, to match an instrument that can't be retuned (A&nbsp;=&nbsp;432
+is about &minus;32).</p>
+<p>The eight pots are Volume on PA1, Cutoff PA2, Resonance PA3, Detune
+(0 to 8&nbsp;Hz of chaos on each pitch) PA4, Motion (0 to 2&nbsp;kHz of
+chaos on the cutoff) PA5, Reverb PA6, Chaos PA7 and Chaos Rate PB0. The
+menu also holds Wave, Filter, Wobble (chaos on each oscillator's
+level), Noise, Space and Tone (the reverb's decay and damping), Spread,
+and the echo's time (up to 0.74&nbsp;s), feedback and mix. Spread pans
+the oscillators apart with equal-power gains, keeping the root and sub
+in the middle; at 0 it is mono. Wiring as for <code>acid</code>.</p>
+<p>Chaos, pitches and cutoff are updated every 16 samples rather than
+every sample: the filters' <code>setFrequency()</code> alone costs 183
+to 233 cycles. A make-up gain after each filter brings both to peaks of
+about 0.8 at full volume, measured at moderate resonance; the Moog
+thins its bass as resonance rises and the MS-20 doesn't, so at high
+resonance they drift apart. After 30&nbsp;s without the encoder the
+screen shows the output waveform, starting each trace where the wave
+crosses zero going up so it holds still; turning or pressing the
+encoder brings the menu back. The patch measured 74&ndash;75% of the CPU
+with five voices and the echo (the reverb is about 29%, the echo about
+8%), and uses 109&nbsp;KB of RAM, 64&nbsp;KB of it the echo.</p>
+<pre><code>pio run -e drone -t upload</code></pre>
+
 <h3>oled</h3>
 <p>A knob on PA1 sets a tone's pitch, a rotary encoder on PB6/PB7
 transposes it in semitones, and the encoder's push switch on PB5 resets

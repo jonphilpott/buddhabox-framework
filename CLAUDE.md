@@ -28,7 +28,7 @@ The project has an educational focus: highly documented code and a
 - **Build one:** `pio run -e singing_bowls` (envs: minimal, singing_bowls,
   drum_machine, custom_voice, compile_all, profile, profile_all, patch_minimal,
   patch_demo, patch_hardware, patch_param, minimal_f401, oled,
-  aeolian_harp, easel, acid, noisebox, easel_matrix; minimal_rp2350 is
+  aeolian_harp, easel, acid, noisebox, easel_matrix, drone; minimal_rp2350 is
   outside default_envs)
 - **Upload:** `pio run -e <env> -t upload` (ST-Link on the SW header: DIO to
   SWDIO, SCK to SWCLK, GND; DFU is unreliable on WeAct F411 boards)
