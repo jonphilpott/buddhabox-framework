@@ -165,6 +165,11 @@ th[colspan] { padding-top: 16px; color: var(--ink); }
   margin: 0 0 4px;
 }
 .include { font: 12.5px var(--mono); color: var(--ink-3); }
+.class-meta {
+  font-size: 13px;
+  color: var(--ink-3);
+  margin: 0 0 10px;
+}
 .method-block {
   border-left: 1px solid var(--line);
   padding: 2px 0 2px 14px;

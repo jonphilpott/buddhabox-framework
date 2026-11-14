@@ -8,11 +8,12 @@
  * called "phase dispersion" or "diffusion", is the first building block of
  * reverb algorithms.
  *
- * In isolation, an allpass filter sounds like a comb of subtle, flanging
- * echoes that cancel out the steady-state pitch information but preserve
- * the overall character. Chain two or three with different delay times and
- * gain values and you get a convincing sense of acoustic space — without
- * the complexity or memory footprint of a full Schroeder/Freeverb reverb.
+ * On a steady tone a single allpass is almost inaudible, since every
+ * frequency keeps its level. On clicks and drum hits it smears the attack
+ * into a short train of echoes. Chain two or three with different delay
+ * times and gain values and you get a convincing sense of acoustic space,
+ * without the complexity or memory footprint of a full Schroeder/Freeverb
+ * reverb.
  *
  * HOW THE ALGORITHM WORKS:
  * ─────────────────────────

@@ -17,7 +17,11 @@ HOW IT WORKS:
    to the opening brace or semicolon); one at namespace level followed by
    `inline`, `constexpr`, `enum` or `struct` documents a free item.
 3. Docstring text becomes HTML: @param/@tparam/@return become labelled
-   lines, "Example...:" blocks become code, "- " lines become lists.
+   lines, "Example...:" blocks become code, "- " lines become lists,
+   indented lines (formulas, diagrams, pin lists) stay as they are, and
+   "-----" underlines under headings are dropped (the heading is enough).
+4. Under each class: its header file and its measured cost, from
+   tools/costs.csv (the output of `pio run -e profile_all`).
 """
 
 import html
@@ -28,6 +32,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'src', 'buddhabox')
 OUT = os.path.join(ROOT, 'docs', 'reference.html')
+COSTS = os.path.join(ROOT, 'tools', 'costs.csv')
 
 CATEGORIES = [
     ('core', 'Core', 'Shared maths, tables, random numbers and pitch.'),
@@ -176,6 +181,31 @@ def inline(text):
     return re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
 
 
+# Words that keep their own capitals when a heading is put in sentence
+# case: abbreviations, names and class names.
+KEEP_CASE = {w.upper(): w for w in [
+    'API', 'AR', 'CV', 'DMA', 'I2C', 'I2S', 'LED', 'LFSR', 'MIDI', 'STM32',
+    'SVF', 'int16', 'Black', 'Pill', 'Chamberlin', 'Karplus-Strong',
+    'West-Coast', 'Xorshift', 'ChorusFlanger', 'EchoDelay', 'OLED', 'DAC',
+    'CPU', 'RAM', 'FM', 'LFO', 'ADC', 'MPR121', 'Rings', 'Plaits']}
+
+
+def sentence_case(head):
+    """"HOW THE DMA WORKS" -> "How the DMA works": the house style keeps
+    capitals for the first word, names and abbreviations."""
+    words = head.split(' ')
+    out = []
+    for i, w in enumerate(words):
+        key = re.sub(r'[^A-Z0-9-]', '', w.upper())
+        if key in KEEP_CASE:
+            out.append(w.upper().replace(key, KEEP_CASE[key]))
+        elif i == 0:
+            out.append(w[:1].upper() + w[1:].lower())
+        else:
+            out.append(w.lower())
+    return ' '.join(out)
+
+
 def doc_to_html(doc, skip_file=True):
     """Convert cleaned docstring lines to HTML (prose, lists, code, tags)."""
     if not doc:
@@ -235,13 +265,28 @@ def doc_to_html(doc, skip_file=True):
                 code.append(line)
                 continue
             flush_code(); mode = 'prose'
+        # An underline under a heading ("─────" or "-----"): drop it.
+        if re.match(r'^[─═━=~_-]{3,}$', s):
+            continue
+        if mode == 'pre':
+            if not s or line.startswith('  '):
+                code.append(line)
+                continue
+            flush_code(); mode = 'prose'
         if not s:
             flush_para(); flush_items()
+            continue
+        # An indented line outside a list (a formula, a diagram, a pin
+        # list): keep its layout instead of running it into the prose.
+        if line.startswith('  ') and not items:
+            flush_para()
+            code.append(line)
+            mode = 'pre'
             continue
         if re.match(r'^[A-Z][A-Z0-9 ()/,\'-]+:', s):  # "HOW IT WORKS:" etc.
             flush_para(); flush_items()
             head, _, rest = s.partition(':')
-            out.append('<h5>%s</h5>' % inline(head.title()))
+            out.append('<h5>%s</h5>' % inline(sentence_case(head)))
             if rest.strip():
                 para.append(rest.strip())
             continue
@@ -268,9 +313,16 @@ def doc_to_html(doc, skip_file=True):
 
 
 def brief(doc):
-    for l in doc or []:
+    # A @brief can wrap onto following lines; it ends at a blank line or tag.
+    doc = doc or []
+    for i, l in enumerate(doc):
         if l.startswith('@brief'):
-            return l[len('@brief'):].strip()
+            words = [l[len('@brief'):].strip()]
+            for nxt in doc[i + 1:]:
+                if not nxt.strip() or nxt.startswith('@'):
+                    break
+                words.append(nxt.strip())
+            return ' '.join(words)
     return ''
 
 
@@ -280,9 +332,59 @@ def anchor(name):
     return re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
 
 
-def render_class(cls, file_doc):
+def load_costs():
+    """Measured costs by class name, from tools/costs.csv. Rows are
+    "Name", "Name<SIZE> (variant)" or "Name.method (variant)"; a class
+    gets every row whose name starts with its own."""
+    costs = {}
+    if not os.path.exists(COSTS):
+        return costs
+    for row in open(COSTS):
+        if row.startswith('#') or row.startswith('module,'):
+            continue
+        f = row.rstrip('\n').split(',')
+        if len(f) < 5:
+            continue
+        name = re.match(r'^(\w+)', f[0]).group(1)
+        costs.setdefault(name, []).append(f)
+    return costs
+
+
+COST_ROWS = load_costs()
+
+
+def cost_html(name):
+    """One line per measured row: cycles a sample, share of the budget,
+    RAM. Method rows (Name.method) are the cost of one call."""
+    rows = COST_ROWS.get(name, [])
+    if not rows:
+        return ''
+    lines = []
+    for f in rows:
+        label, cycles, ram, pct = f[0], float(f[2]), int(f[3]), float(f[4])
+        if '.' in label.split(' ')[0]:
+            method = label.split('.', 1)[1]
+            lines.append('<code>%s</code>: %s cycles a call' %
+                         (html.escape(method), '{:,.0f}'.format(cycles)))
+        else:
+            extra = label[len(name):].strip()
+            lines.append('%s%s cycles a sample (%.1f%% of the budget), '
+                         '%s bytes' % (
+                             '<code>%s</code>: ' % html.escape(label)
+                             if extra else '',
+                             '{:,.0f}'.format(cycles), pct,
+                             '{:,}'.format(ram)))
+    return '<br>'.join(lines)
+
+
+def render_class(cls, file_doc, include):
     parts = ['<div class="module-card" id="%s">' % anchor(cls['name'])]
     parts.append('<h4>%s</h4>' % html.escape(cls['name']))
+    meta = '<code>#include "%s"</code>' % include
+    cost = cost_html(cls['name'])
+    if cost:
+        meta += '<br>Cost on the F411: ' + cost
+    parts.append('<p class="class-meta">%s</p>' % meta)
     parts.append('<div class="method-sig">%s</div>' %
                  html.escape(cls['decl']))
     doc = cls['doc']
@@ -334,7 +436,7 @@ def main():
                             (html.escape(item['decl']),
                              doc_to_html(item['doc'])))
             for cls in classes:
-                body.append(render_class(cls, file_doc))
+                body.append(render_class(cls, file_doc, include))
         body.append('</section>')
     page = TEMPLATE.replace('{{NAV}}', '\n'.join(nav))
     page = page.replace('{{BODY}}', '\n'.join(body))
@@ -407,7 +509,8 @@ TEMPLATE = '''<!doctype html>
           stroke-width="4" stroke-linecap="round"/>
   </svg>
   <h1>BuddhaBox <small>API reference</small></h1>
-  <p>Every module, generated from the source docstrings.
+  <p>Every module. <code>tools/gen_docs.py</code> generates this page
+     from the header comments, so edit those, not this file.
      <a href="index.html">Back to the guide</a>.</p>
 </header>
 <nav>

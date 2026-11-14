@@ -66,7 +66,7 @@
  *
  * Example usage — Karplus-Strong plucked string:
  *   DelayLine<1024> string;
- *   float delaySamples = SAMPLE_RATE / midiToFreq(NOTE_C4);  // ~168.7 samples
+ *   float delaySamples = SAMPLE_RATE / midiToFreq(NOTE_C4);  // ~168.6 samples
  *
  *   // Initial excitation: fill delay with noise burst
  *   // Then in audio callback:

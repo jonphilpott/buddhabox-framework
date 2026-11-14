@@ -136,13 +136,15 @@ python3 tools/new_project.py ../bells --example custom_voice
 cd ../my_synth &amp;&amp; pio run</code></pre>
 <p>Each project has its own <code>platformio.ini</code>, so one board can
 upload with an ST-Link and another with DFU without touching the
-framework. For example, <code>analogRead()</code> gives the ADC 15
-clocks to sample by default. That is plenty for 10k and 100k pots: a
-B100k pot at mid-travel, its worst case, read only 0.07% (3 counts)
-lower than with 480 clocks, and showed no carry-over from the channel
-read before it. Both are hidden by <code>AnalogInput</code>'s
-hysteresis. Sources with a higher resistance, such as a light-dependent
-resistor in a divider, may need more time: uncomment
+framework.</p>
+<p>The ADC's sampling time is one such per-project setting.
+<code>analogRead()</code> gives the ADC 15 clocks to sample by default,
+which is enough for 10k and 100k pots. A B100k pot at mid-travel, its
+worst case, read only 0.07% (3 counts) lower than with 480 clocks, and
+showed no carry-over from the channel read before it;
+<code>AnalogInput</code>'s hysteresis hides both. Sources with a higher
+resistance, such as a light-dependent resistor in a divider, may need
+more time: uncomment
 <code>-D ADC_SAMPLINGTIME=ADC_SAMPLETIME_480CYCLES</code> in that
 project's <code>build_flags</code>, or put a 100&nbsp;nF capacitor from
 the pin to ground.</p>
@@ -518,8 +520,8 @@ callback fills the other: about 5.8 ms per half at 44.1 kHz.</p>
 <section id="conventions">
 <h2>Conventions</h2>
 
-<h3>Every module works out of the box</h3>
-<p>Constructors set sensible defaults, so a global <code>Svf filter;</code>
+<h3>Every module works as soon as it is declared</h3>
+<p>Constructors set usable defaults, so a global <code>Svf filter;</code>
 is ready to use. The modules ported from Mutable Instruments also have
 <code>init(float sampleRate = SAMPLE_RATE)</code>, which resets them to
 silence; you only need to call it to restart a voice.</p>
@@ -547,7 +549,8 @@ fast <code>fastExp2()</code>/<code>fastLog2()</code> in
 <section id="choosing">
 <h2>Choosing between similar modules</h2>
 <p>Several jobs have both an original BuddhaBox module and a Mutable
-Instruments one. They are deliberately different, not duplicates:</p>
+Instruments one. They differ on purpose: the first is cheaper, the
+second does more.</p>
 <table>
   <tr><th>Job</th><th>Simpler (BuddhaBox)</th><th>Richer (Mutable Instruments)</th></tr>
   <tr><td>Classic waveforms</td><td><code>Oscillator</code>: naive, cheapest, aliases at high pitch</td><td><code>BasicOscillator</code>, <code>VariableShapeOscillator</code>: band-limited, pulse width, sync</td></tr>
@@ -568,8 +571,9 @@ Instruments one. They are deliberately different, not duplicates:</p>
 
 <p>The F411 Black Pill gives you about <strong>2,177 CPU cycles per
 sample</strong> (96 MHz &divide; 44.1 kHz) and <strong>128 KB of RAM</strong>
-(the F401: 1,905 cycles and 64 KB), of which the Arduino core, USB serial and the DMA buffer take about 6 KB.
-RAM figures below are <code>sizeof()</code> of each object, measured.
+(the F401: 1,905 cycles and 64 KB). The Arduino core, USB serial and
+the DMA buffer take about 6 KB of the RAM. RAM figures below are the
+measured <code>sizeof()</code> of each object.
 CPU figures are measured on the board (below); measure your own patch
 with <code>AudioEngine::cpuLoad()</code>.</p>
 
@@ -592,18 +596,19 @@ with <code>AudioEngine::cpuLoad()</code>.</p>
 <p>Everything else uses under 0.5 KB.</p>
 
 <h3>Measured CPU cost</h3>
-<p>Measured on an F411 Black Pill at 96 MHz with the <code>profile_all</code>
-example (GCC 9, <code>-O2</code>; the GCC 12 that
-<code>ststm32@20.0.0</code> brings measured the same or up to 5% lower on
-whole patches), fastest of five runs of 4,096 samples,
-loop overhead removed. Inputs are full-scale white noise; drums, plucks
-and envelopes are kept sounding. Shares are of the F411's 2,177 cycles
-per sample. Cycle counts are within 3% of the 84 MHz F401's, so on an
-F401 divide them by its 1,905 instead. Keep a patch below about 80%
-(roughly 1,740 cycles on the F411, 1,500 on the F401) to leave room for
-USB and
-<code>loop()</code>. RAM is <code>sizeof()</code> at the template size
-shown; a smaller buffer saves RAM, not cycles.</p>
+<p>These were measured on an F411 Black Pill at 96 MHz with the
+<code>profile_all</code> example, built with GCC 9 at <code>-O2</code>.
+The GCC 12 that <code>ststm32@20.0.0</code> brings measured the same or
+up to 5% lower on whole patches. Each figure is the fastest of five runs
+of 4,096 samples, with the loop's own cost removed. Inputs are
+full-scale white noise, and drums, plucks and envelopes are kept
+sounding.</p>
+<p>Shares are of the F411's 2,177 cycles per sample. The F401 takes
+within 3% of the same cycles, so on an F401 divide them by its 1,905
+instead. Keep a patch below about 80% (about 1,740 cycles on the F411,
+1,500 on the F401) to leave room for USB and <code>loop()</code>. RAM is
+<code>sizeof()</code> at the template size shown; a smaller buffer saves
+RAM, not cycles.</p>
 <table>
   <tr><th>Module</th><th>Cycles per sample</th><th>Share of the CPU</th><th>RAM</th></tr>
   <tr><th colspan="4">Oscillators</th></tr>
@@ -709,17 +714,16 @@ shown; a smaller buffer saves RAM, not cycles.</p>
   <tr><td><code>Tube.setFrequency</code></td><td>64</td><td>2.9%</td><td>&ndash;</td></tr>
   <tr><td><code>FmOperators.setFrequency</code></td><td>161</td><td>7.4%</td><td>&ndash;</td></tr>
 </table>
-<p><strong>Treat these as a rough guide.</strong> Each figure is one
-module timed on its own. In a full patch, modules share the flash cache,
-the compiler lays code out differently and interrupts arrive, so the
-same module can cost more. Adding up the table can badly underestimate a
-patch: <code>patch_demo</code> adds up to 75% but measures 98%. Use the
+<p><strong>The figures are only a guide.</strong> Each is one module
+timed on its own. In a full patch, modules share the flash cache, the
+compiler lays code out differently and interrupts arrive, so the same
+module can cost more. Adding up the table can fall well short:
+<code>patch_demo</code> adds up to 75% but measures 98%. Use the
 table to compare modules and spot the expensive ones, then check the
 real patch with <code>AudioEngine::cpuLoad()</code>.</p>
-<p><strong>The resonator dominates.</strong> It costs about 115 cycles plus
-49 per mode, so 24 modes alone use 59% of the CPU (two-thirds on
-the F401). 12&ndash;16 modes
-is plenty for bells and bowls.</p>
+<p><strong>The resonator is the most expensive module.</strong> It costs
+about 115 cycles plus 49 per mode, so 24 modes alone use 59% of the CPU
+(two-thirds on the F401). Bells and bowls need only 12 to 16.</p>
 <p><strong>Some modules cost more when they work harder.</strong> The
 limiter costs about 40 cycles when the signal is below its threshold and
 about 100 while it is limiting. Reverb costs about 5% more with loud
@@ -1119,29 +1123,31 @@ come from a <code>Colour</code> scale. The OLED shows the sequence and a
 menu: turn the encoder to pick an item, press to edit it, turn to change
 it. The items are Tempo, Cutoff, Resonance, Env Mod, Decay, Accent,
 Drive, Wave, Filter, Root (C1 to C3, shown by note name), Colour,
-Random, Chaos, Chaos Rate, Delay Time,
-Delay Mix, Feedback, Reverb and Randomize, which rolls a new sequence.
-Random is noisebox's "Turing machine": on each step, the chance of
-rewriting the step about to play (note, accent, slide and rest), so at
-0 the bar repeats and higher up it keeps changing. Chaos lets a
+Random, Chaos, Chaos Rate, Delay Time, Delay Mix, Feedback, Reverb and
+Randomize, which rolls a new sequence.</p>
+<p>Random is noisebox's "Turing machine": the chance, on each step, of
+rewriting the step about to play (note, accent, slide and rest). At 0
+the bar repeats; higher up it keeps changing. Chaos lets a
 <code>Lorenz</code> attractor wander the cutoff, up to two octaves either
-way, and the resonance; Chaos Rate runs from about one loop a minute to
-about 5 a second, slow enough for trance-style sweeps. The attractor is stepped only with each cutoff update (every 8
-samples), which costs an eighth as much as stepping it every sample.
-Filter switches between <code>Ms20Filter</code>, whose resonance keeps
+way, and the resonance. Chaos Rate runs from about one loop a minute,
+slow enough for long sweeps, to about 5 a second. The attractor is
+stepped only with each cutoff update (every 8 samples), which costs an
+eighth as much as stepping it every sample.</p>
+<p>Filter switches between <code>Ms20Filter</code>, whose resonance keeps
 the bass, and the Moog ladder, whose bass thins as resonance rises.
 The MS-20 turns its input down to a quarter inside the loop, so its
 clipper leaves room for the resonance to build from a full-scale saw,
-then turns the output back up; its peaks (about &plusmn;2.5) go on into
-the overdrive and the final soft clip.
-The voice then goes through a tempo-synced echo, 3/16 by default, whose
-repeats darken as they fade, and the spring reverb. Wiring as for
-<code>oled</code>, plus eight optional pots: Cutoff on PA1, Resonance
-PA2, Env Mod PA3, Decay PA4, Accent PA5, Drive PA6, Chaos PA7 and Delay
-Mix PB0; Tempo is set from the menu. Turning one sets its menu item, so the screen always shows
-where the knobs are. Set <code>kKnobs</code> to <code>false</code>
-without them. The patch uses 56% of the CPU, with Chaos, Chaos Rate and
-Random all at full, and 89&nbsp;KB of RAM.</p>
+then turns the output back up. Its peaks (about &plusmn;2.5) go on into
+the overdrive and the final soft clip. The voice then goes through a
+tempo-synced echo, 3/16 by default, whose repeats darken as they fade,
+and the spring reverb.</p>
+<p>Wiring as for <code>oled</code>, plus eight optional pots: Cutoff on
+PA1, Resonance PA2, Env Mod PA3, Decay PA4, Accent PA5, Drive PA6, Chaos
+PA7 and Delay Mix PB0; Tempo is set from the menu. Turning a pot sets
+its menu item, so the screen always shows where the knobs are. Set
+<code>kKnobs</code> to <code>false</code> without them. The patch uses
+56% of the CPU, with Chaos, Chaos Rate and Random all at full, and
+89&nbsp;KB of RAM.</p>
 <pre><code>pio run -e acid -t upload</code></pre>
 
 <h3>noisebox</h3>
@@ -1155,27 +1161,34 @@ are the panel: Noise on PA1, Timbre PA2, FM PA3, Mod Rate PA4, Rate
 (the pulser, 4&nbsp;s to 30&nbsp;ms) PA5, Decay PA6, Random PA7 and
 Space (the spring) PB0. Random is the chance that each pulse rewrites
 the step about to play: at 0 the loop repeats forever, at full every
-note is new. The menu holds the main volume (applied after the final soft limit, so
-it changes only the level) and the routing: the mod oscillator's wave
-(triangle, saw, square or stepped noise), whether it follows the
-pitch as a ratio or runs free from 0.05&nbsp;Hz to 2&nbsp;kHz, how
-much it moves the folding, its own level, the pitch (chromatic, C1
-to C6, shown by note name: the root of the sequence's scale), a sine or analog
-fold curve, a Lorenz attractor wobbling Timbre and FM, the crusher,
-Ping or Drone for the gate, the sequence's length and scale, and the
-echo. Wiring as for <code>acid</code>.</p>
+note is new.</p>
+<p>The menu holds the main volume, applied after the final soft limit so
+it changes only the level, and the routing:</p>
+<ul>
+  <li>the mod oscillator's wave (triangle, saw, square or stepped
+    noise);</li>
+  <li>whether it follows the pitch as a ratio or runs free from
+    0.05&nbsp;Hz to 2&nbsp;kHz, how much it moves the folding, and its
+    own level;</li>
+  <li>the pitch, the root of the sequence's scale (chromatic, C1 to C6,
+    shown by note name);</li>
+  <li>a sine or analog fold curve, and a Lorenz attractor wobbling Timbre
+    and FM;</li>
+  <li>the crusher, Ping or Drone for the gate, the sequence's length and
+    scale, and the echo.</li>
+</ul>
+<p>Wiring as for <code>acid</code>.</p>
 <p>The spring runs at half the sample rate, with the gaps filled by
-straight-line interpolation. A
-real spring passes little above 5&nbsp;kHz, and
-<code>SpringReverb&lt;1024, 2&gt;</code> reaches 2 samples back where
-the full-rate tank reaches 4: the same time, so the chirp stays in
-place. It does sound crunchier, though. Nothing above 11&nbsp;kHz fits
-at half rate, and averaging pairs of samples on the way in removes only
-part of the bright fold and noise above that; the rest folds back down
-to the wrong pitches inside the spring. That suits this patch. For a
-clean spring, low-pass the input properly first, or run it at the full
-rate. The
-crusher is skipped at 0, since it cost about 5% even when passing
+straight-line interpolation. A real spring passes little above
+5&nbsp;kHz, and <code>SpringReverb&lt;1024, 2&gt;</code> reaches 2
+samples back where the full-rate tank reaches 4: the same time, so the
+chirp stays in place. It does sound crunchier. Nothing above
+11&nbsp;kHz fits at half rate, and averaging pairs of samples on the way
+in removes only part of the bright fold and noise above that; the rest
+folds back down to the wrong pitches inside the spring. That suits this
+patch. For a clean spring, low-pass the input properly first, or run it
+at the full rate.</p>
+<p>The crusher is skipped at 0, since it cost about 5% even when passing
 the sound straight through. The patch measured 71&ndash;74% of the CPU
 on the board whatever the settings, with <code>loop()</code> running
 66 times a second, and uses 50&nbsp;KB of RAM.</p>
@@ -1265,8 +1278,8 @@ display: read the controls and redraw on a <code>millis()</code> timer in
 
 <h3>profile</h3>
 <p>Measures each module's cost on the board, in cycles per sample and as
-a share of the 2,177-cycle budget (1,905 on the F401), and prints a table over USB serial
-every few seconds. It never starts the audio engine. A patch over 100%
+a share of the 2,177-cycle budget (1,905 on the F401), and prints a
+table over USB serial every few seconds. It never starts the audio engine. A patch over 100%
 starves <code>loop()</code>, so its own meter can never print; the
 profiler reports regardless. The modules are set up as in
 <code>singing_bowls</code>, and the last row predicts that patch's load.
@@ -1280,8 +1293,9 @@ modulates a parameter, and prints CSV for tools such as a patch editor to
 read. It refines <code>profile</code> in four ways: interrupts are off
 while timing, each module keeps the fastest of five runs, the cost of the
 empty loop is subtracted, and each module is timed in its own small
-function so the compiler inlines it as it would in a real patch. Drums and plucks are re-struck and envelopes
-re-gated every 2,048 samples, so each module is timed while it sounds.</p>
+function so the compiler inlines it as it would in a real patch. Drums
+and plucks are re-struck and envelopes re-gated every 2,048 samples, so
+each module is timed while it sounds.</p>
 <pre><code>pio run -e profile_all -t upload
 pio device monitor</code></pre>
 <table>
@@ -1290,7 +1304,7 @@ pio device monitor</code></pre>
   <tr><td><code>header</code></td><td>Path under <code>src/buddhabox</code>, to match rows to the reference</td></tr>
   <tr><td><code>cycles_per_sample</code></td><td>Cost per <code>process()</code> call, loop overhead removed</td></tr>
   <tr><td><code>ram_bytes</code></td><td><code>sizeof()</code> the object at that template size</td></tr>
-  <tr><td><code>pct_of_budget</code></td><td>Share of the 1,905-cycle budget</td></tr>
+  <tr><td><code>pct_of_budget</code></td><td>Share of the board's budget: 2,177 cycles on the F411, 1,905 on the F401</td></tr>
 </table>
 <p>Template sizes are small so that everything fits in RAM at once; buffer
 size changes RAM, not cycles. Tight loops stay in the flash accelerator's
@@ -1361,8 +1375,9 @@ cutoff need a curve: the ear hears 100 to 200 Hz as the same step as
 800 Hz rather than the 4,040 Hz a straight line gives.
 <code>Range</code> also takes an LFO's &minus;1 to 1
 (<code>setInput(-1, 1)</code>) and runs backwards if its ends are
-swapped. Cables into one input add up; to add signals once and send the sum to
-several places, use a <code>Mixer</code> (four inputs, levels set by the
+swapped.</p>
+<p>Cables into one input add up. To add signals once and send the sum
+to several places, use a <code>Mixer</code> (four inputs, levels set by the
 cable amounts, chained for more). Cables only add, so to let one signal
 scale another (a knob setting an LFO's depth, an envelope as a VCA) use
 <code>Multiply</code>. All three live in <code>util/</code>, with
@@ -1377,7 +1392,7 @@ must also stay under 64 KB). CPU comes from the measured costs above
 mode), plus each modulated setter's cost divided by
 <code>control_every</code>. RAM includes the framework's own 6 KB and
 scales each buffer to its template size. The RAM estimate is close;
-the CPU estimate is a rough guide and can be well below the real load.
+the CPU estimate can be well below the real load.
 The build reports the real RAM, and the starter <code>main.cpp</code>
 prints the real CPU.</p>
 <p><code>examples/patch_demo</code> uses all three kinds: a clock
@@ -1395,8 +1410,9 @@ headroom) and the build reports 42.5 KB.</p>
 <code>patch::osc</code>. The starter <code>main.cpp</code> prints
 <code>cpuLoad()</code> and <code>cpuPeak()</code> over USB serial once a
 second, to check the estimate. Names the generator invents end in
-<code>_</code> (<code>osc_v_</code>), so module ids may not. The tool writes <code>main.cpp</code> only if it
-does not exist, so your code there is never overwritten.</p>
+<code>_</code> (<code>osc_v_</code>), so module ids may not. The tool
+writes <code>main.cpp</code> only if it does not exist, so it never
+overwrites your code.</p>
 <p>Each module's inputs, outputs and setters come from
 <code>tools/modules.json</code>, which <code>tools/gen_modules.py</code>
 reads from the headers: <code>process()</code> arguments are inputs; its
@@ -1605,7 +1621,7 @@ these changes:</p>
 <a href="reference.html">reference</a>.</p>
 <!-- CATALOGUE -->
 <h3>Core</h3><div class="catalogue">
-<div><a href="reference.html#dsp-common-h">dsp_common.h</a> — Shared constants, types, and utility functions for the BuddhaBox DSP</div>
+<div><a href="reference.html#dsp-common-h">dsp_common.h</a> — Shared constants, types, and utility functions for the BuddhaBox DSP framework.</div>
 <div><a href="reference.html#midi-utils-h">midi_utils.h</a> — MIDI note number to frequency conversion and note constants.</div>
 <div><a href="reference.html#lfsr">LFSR</a>, <a href="reference.html#random">Random</a> — LFSR-based random number generator for non-audio randomness.</div>
 </div>
@@ -1640,7 +1656,7 @@ these changes:</p>
 <div><a href="reference.html#moogfilter">MoogFilter</a> — 4-pole Moog ladder filter approximation with resonance.</div>
 <div><a href="reference.html#ms20filter">Ms20Filter</a> — MS-20 low-pass filter: resonance that screams but keeps the bass.</div>
 <div><a href="reference.html#onepoleout">OnePoleOut</a>, <a href="reference.html#onepole">OnePole</a> — Zero-delay-feedback one-pole low-pass / high-pass filter.</div>
-<div><a href="reference.html#svfilter">SVFilter</a> — State Variable Filter (SVF) with simultaneous low/high/bandpass</div>
+<div><a href="reference.html#svfilter">SVFilter</a> — State Variable Filter (SVF) with simultaneous low/high/bandpass outputs.</div>
 <div><a href="reference.html#svfout">SvfOut</a>, <a href="reference.html#svf">Svf</a> — Zero-delay-feedback state-variable filter (stmlib&#x27;s Svf).</div>
 <div><a href="reference.html#vowelfilter">VowelFilter</a> — A &quot;talking&quot; filter: five formant band-passes, from Plaits.</div>
 </div>
@@ -1649,22 +1665,22 @@ these changes:</p>
 <div><a href="reference.html#tempoclock">TempoClock</a> — Sample-accurate tempo clock for synchronizing events and sequencing.</div>
 <div><a href="reference.html#clocktoramp">ClockToRamp</a> — Turns a clock into a smooth phase ramp (Tides 2 / Marbles).</div>
 <div><a href="reference.html#colour">Colour</a> — Five-note just-intonation scales (&quot;colours&quot;) plus a melody maker.</div>
-<div><a href="reference.html#envelope">Envelope</a> — Attack-Release (AR) envelope generator for shaping amplitude over</div>
+<div><a href="reference.html#envelope">Envelope</a> — Attack-Release (AR) envelope generator for shaping amplitude over time.</div>
 <div><a href="reference.html#hysteresisquantizer">HysteresisQuantizer</a> — Turns a 0..1 knob into N steps without flicker at the edges.</div>
 <div><a href="reference.html#lag">Lag</a> — Clock-synchronised glide between steps: Marbles&#x27; &quot;steps&quot; control.</div>
 <div><a href="reference.html#lorenz">Lorenz</a> — Lorenz attractor: a chaotic, never-repeating modulation source.</div>
-<div><a href="reference.html#pulser">Pulser</a> — A timing pulse generator that fires once or repeats, Buchla</div>
+<div><a href="reference.html#pulser">Pulser</a> — A timing pulse generator that fires once or repeats, Buchla Easel style.</div>
 <div><a href="reference.html#quantizer">Quantizer</a> — Weighted scale quantizer from Marbles.</div>
 <div><a href="reference.html#randomsequence">RandomSequence</a> — Random values that can loop: Marbles&#x27; &quot;déjà vu&quot; control.</div>
 <div><a href="reference.html#sampleandhold">SampleAndHold</a> — Sample and Hold — captures and freezes an input on a trigger.</div>
 <div><a href="reference.html#segmentenvelope">SegmentEnvelope</a> — Peaks&#x27; multi-segment envelope: ADSR, AD, AR, looping, or custom.</div>
-<div><a href="reference.html#sequentialvoltage">SequentialVoltage</a> — A five-step sequencer, after the Buchla Easel&#x27;s sequential</div>
+<div><a href="reference.html#sequentialvoltage">SequentialVoltage</a> — A five-step sequencer, after the Buchla Easel&#x27;s sequential voltage source.</div>
 <div><a href="reference.html#slewlimiter">SlewLimiter</a> — Slew limiter with independent rise and fall times.</div>
 <div><a href="reference.html#slope">Slope</a> — Tides 2 function generator: envelope, LFO or oscillator.</div>
 </div>
 <h3>Utilities</h3><div class="catalogue">
 <div><a href="reference.html#mixer">Mixer</a> — Mixer: adds up to four signals into one.</div>
-<div><a href="reference.html#multiply">Multiply</a> — Multiply: one signal times another (a VCA, depth control or</div>
+<div><a href="reference.html#multiply">Multiply</a> — Multiply: one signal times another (a VCA, depth control or ring modulator).</div>
 <div><a href="reference.html#param">Param</a> — Param: a value your own code sets and a patch&#x27;s cables read.</div>
 <div><a href="reference.html#range">Range</a> — Range: rescale a control signal, in a straight line or in octaves.</div>
 </div>
@@ -1678,7 +1694,7 @@ these changes:</p>
 <h3>Effects</h3><div class="catalogue">
 <div><a href="reference.html#chorus">Chorus</a> — Rings&#x27; stereo chorus: gentle, slow and wide.</div>
 <div><a href="reference.html#decimator">Decimator</a> — Anti-aliased sample-rate reducer from Plaits.</div>
-<div><a href="reference.html#delayline">DelayLine</a> — Delay line with interpolated reads for echo, chorus, and</div>
+<div><a href="reference.html#delayline">DelayLine</a> — Delay line with interpolated reads for echo, chorus, and Karplus-Strong.</div>
 <div><a href="reference.html#diffuser">Diffuser</a> — Clouds&#x27; stereo diffuser: four all-passes per channel.</div>
 <div><a href="reference.html#ensemble">Ensemble</a> — Rings&#x27; string-machine ensemble: a lush, shimmering chorus.</div>
 <div><a href="reference.html#fxengine">FxEngine</a> — Toolkit for delay-based effects (Clouds/Rings/Elements FxEngine).</div>
@@ -1686,7 +1702,7 @@ these changes:</p>
 <div><a href="reference.html#overdrive">Overdrive</a> — Level-compensated soft-clipping overdrive from Plaits.</div>
 <div><a href="reference.html#pitchshifter">PitchShifter</a> — Clouds&#x27; delay-line pitch shifter.</div>
 <div><a href="reference.html#reverb">Reverb</a> — Stereo plate-style reverb from Rings, Elements and Clouds.</div>
-<div><a href="reference.html#springreverb">SpringReverb</a> — A two-spring tank: the drippy, boingy reverb of guitar amps and</div>
+<div><a href="reference.html#springreverb">SpringReverb</a> — A two-spring tank: the drippy, boingy reverb of guitar amps and the Buchla Easel.</div>
 <div><a href="reference.html#tablewavefolder">TableWavefolder</a> — Plaits&#x27; table wavefolder: sine fold and analog-circuit fold.</div>
 <div><a href="reference.html#wavefolder">WaveFolder</a> — Single-stage wave folder for west-coast/Buchla-style synthesis.</div>
 </div>
@@ -1694,7 +1710,7 @@ these changes:</p>
 <div><a href="reference.html#karplusstrong">KarplusStrong</a> — Karplus-Strong plucked string synthesis.</div>
 <div><a href="reference.html#modalresonator">ModalResonator</a> — Rings&#x27; modal resonator: struck or bowed strings, bars and bells.</div>
 <div><a href="reference.html#plucker">Plucker</a> — Rings&#x27; pick/finger exciter for StringModel and ModalResonator.</div>
-<div><a href="reference.html#stringmodel">StringModel</a> — Elements&#x27; string: Karplus-Strong with dispersion and a buzzing</div>
+<div><a href="reference.html#stringmodel">StringModel</a> — Elements&#x27; string: Karplus-Strong with dispersion and a buzzing bridge.</div>
 <div><a href="reference.html#tube">Tube</a> — Elements&#x27; reed-and-tube wind model.</div>
 </div>
 <h3>Drums</h3><div class="catalogue">
@@ -1713,9 +1729,9 @@ these changes:</p>
 <div><a href="reference.html#analoginput">AnalogInput</a> — Smoothed analog input reader for external sensors.</div>
 <div><a href="reference.html#encoderinput">EncoderInput</a> — One rotary encoder, counted in hardware by timer TIM4.</div>
 <div><a href="reference.html#userled">UserLED</a> — Driver for the onboard user LED (PC13) on the Black Pill.</div>
-<div><a href="reference.html#matrixkeypad">MatrixKeypad</a> — 5×5 diode matrix keypad — debounced input with per-key</div>
+<div><a href="reference.html#matrixkeypad">MatrixKeypad</a> — 5×5 diode matrix keypad — debounced input with per-key trigger/hold/release detection and N-key rollover.</div>
 <div><a href="reference.html#menuitem">MenuItem</a>, <a href="reference.html#menu">Menu</a> — A scrolling settings menu on an Oled, driven by an encoder.</div>
-<div><a href="reference.html#mpr121input">MPR121Input</a> — MPR121 capacitive touch controller — standalone I2C driver</div>
+<div><a href="reference.html#mpr121input">MPR121Input</a> — MPR121 capacitive touch controller — standalone I2C driver with per-electrode trigger/hold/release detection.</div>
 <div><a href="reference.html#muxinput">MuxInput</a> — CD74HC4067 16-channel analog multiplexer driver.</div>
 <div><a href="reference.html#oled">Oled</a> — Driver for 128x64 monochrome I2C OLED displays (SSD1306, SH1106).</div>
 <div><a href="reference.html#switchinput">SwitchInput</a> — Debounced digital switch input with trigger/hold/release detection.</div>
