@@ -11,6 +11,13 @@ Every module processes one sample per `process()` call, works in floats
 normalised to ±1, and allocates nothing at run time: buffers are sized by
 template parameters, and lookup tables live in flash.
 
+It also runs on the RP2350 (Raspberry Pi Pico 2 and other boards), with
+the audio on the chip's second core: `pio run -e minimal_rp2350 -t upload`
+(hold BOOTSEL while plugging in). I2S on GP10 (BCLK), GP11 (LRCLK) and
+GP12 (DIN); see the guide.
+
+Power the DAC board from 5 V (the 5V or VBUS pin), not 3.3 V.
+
 ## Set up the build environment
 
 You need git, Python 3 and [PlatformIO Core](https://platformio.org) (the

@@ -8,7 +8,8 @@
  *    another block of samples. Fill the buffer one stereo frame at a time.
  * 3. setup(): configure the objects, then start the audio engine.
  *
- * Wiring: PB12 -> LRCLK/WSEL, PB13 -> BCLK, PB15 -> DIN on the UDA1334A.
+ * Wiring: PB12 -> LRCLK/WSEL, PB13 -> BCLK, PB15 -> DIN on the UDA1334A,
+ * and its VIN to the Black Pill's 5V pin (not 3V3).
  */
 
 #include <Arduino.h>

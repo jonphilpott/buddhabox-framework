@@ -1,6 +1,10 @@
 /**
- * @file audio_engine.cpp
+ * @file audio_engine_stm32.cpp
  * @brief I2S DMA audio output implementation for STM32F411CE / F401CC + UDA1334A.
+ *
+ * ONE FILE PER CHIP: this whole file is skipped unless the STM32 Arduino
+ * core is building it (ARDUINO_ARCH_STM32); audio_engine_rp2.cpp is the
+ * RP2350's. Both implement the same audio_engine.h.
  *
  * This file contains all the low-level hardware setup for the I2S peripheral,
  * DMA controller, and GPIO pins. You shouldn't need to modify this unless
@@ -19,6 +23,8 @@
  * the start of the buffer when it reaches the end, creating the continuous
  * double-buffer ping-pong described in audio_engine.h.
  */
+
+#if defined(ARDUINO_ARCH_STM32)
 
 #include "buddhabox/engine/audio_engine.h"
 #include <Arduino.h>
@@ -243,3 +249,5 @@ void begin() {
 } // namespace AudioEngine
 
 } // namespace bb
+
+#endif // ARDUINO_ARCH_STM32

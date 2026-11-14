@@ -50,6 +50,7 @@
  *
  * Wiring:
  *   Audio    PB12 -> LRCLK/WSEL, PB13 -> BCLK, PB15 -> DIN (UDA1334A)
+ *            VIN -> 5V, GND -> GND (5 V, not 3V3)
  *   OLED     VCC -> 3V3, GND -> GND, SCL -> PB8, SDA -> PB9
  *   Encoder  A -> PB6, B -> PB7, C (middle pin) -> GND
  *   Push     one leg -> PB5, the other -> GND

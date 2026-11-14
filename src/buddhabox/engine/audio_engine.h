@@ -32,13 +32,27 @@
  * The result: uninterrupted audio with no gaps or clicks, as long as your
  * audioCallback() finishes before the current half finishes playing.
  *
+ * TWO CHIPS, ONE API: audio_engine_stm32.cpp drives the Black Pill's I2S
+ * peripheral as described here; audio_engine_rp2.cpp does the same job on
+ * an RP2350 (Pico 2 and others), with the audio loop on its second core
+ * instead of in an interrupt. Whichever chip is being built for, the
+ * other file compiles to nothing.
+ *
  * I2S PIN CONNECTIONS (Black Pill → UDA1334A):
  * ────────────────────────────────────────────
  *   PB12 → WSEL (Word Select / LRCLK) — toggles between left/right channel
  *   PB13 → BCLK (Bit Clock)           — clocks out individual bits
  *   PB15 → DIN  (Data In)             — the actual audio data bits
  *   GND  → GND
- *   3V3  → VIN  (or 5V depending on your UDA1334A board)
+ *   5V   → VIN  (5 V, not 3V3: see the guide's Hardware section)
+ *
+ * I2S PIN CONNECTIONS (RP2350 → UDA1334A), set by BB_I2S_BCLK and
+ * BB_I2S_DOUT below:
+ *   GP10 → BCLK
+ *   GP11 → WSEL (always the pin after BCLK)
+ *   GP12 → DIN
+ *   5V   → VIN  (the board's 5V or VBUS pin, not 3V3)
+ *   GND  → GND
  *
  * USAGE:
  * ─────
@@ -83,7 +97,8 @@
  * @param length  Number of int16_t values to fill (= frames * 2 for stereo).
  *                With AUDIO_BLOCK_SIZE=256, length will be 512.
  *
- * IMPORTANT: This runs in interrupt context! Keep it fast:
+ * IMPORTANT: on the STM32 this runs in interrupt context (on the
+ * RP2350, on core 1, which has the same rules). Keep it fast:
  *   - No Serial.print() or other I/O
  *   - No analogRead() (too slow)
  *   - No dynamic memory allocation (malloc/new)
@@ -106,9 +121,27 @@ extern void audioCallback(int16_t *buffer, uint16_t length);
  *
  * A build flag rather than a function call: when it's 0, the engine
  * never touches the pin at all, not even to set it up.
+ *
+ * STM32 only. On the RP2350, boards differ too much (no LED, or a colour
+ * LED that needs a driver), so use cpuPeak() there: loop() runs on its
+ * own core and can always report.
  */
 #ifndef BB_OVERRUN_LED
 #define BB_OVERRUN_LED 1
+#endif
+
+/**
+ * RP2350 I2S pins, as GPIO numbers (ignored on the STM32, whose I2S pins
+ * are fixed). LRCLK is always BB_I2S_BCLK + 1. Override in
+ * platformio.ini to suit the board:
+ *
+ *   build_flags = ... -D BB_I2S_BCLK=2 -D BB_I2S_DOUT=4
+ */
+#ifndef BB_I2S_BCLK
+#define BB_I2S_BCLK 10
+#endif
+#ifndef BB_I2S_DOUT
+#define BB_I2S_DOUT 12
 #endif
 
 namespace bb {
@@ -123,7 +156,8 @@ void begin();
 /**
  * How much of the CPU the last audioCallback() used.
  *
- * Measured with the Cortex-M4's cycle counter around each callback. Use
+ * Measured around each callback: with the Cortex-M4's cycle counter on
+ * the STM32, the 1 MHz system timer on the RP2350. Use
  * it to find out whether a patch fits: keep it below about 0.8 to leave
  * room for loop() and the USB serial port.
  *

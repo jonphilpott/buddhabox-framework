@@ -7,6 +7,9 @@ still works: `-e minimal_f401`) and an **I2S DAC** (UDA1334A,
 or MAX98357A). It grew out of the BuddhaBox generative ambient instrument
 (`~/git/buddhabox`, which will be rebuilt on this framework) and adds ports
 of Mutable Instruments modules from the Partials library (`~/git/partials`).
+It also runs on the **RP2350** (Pico 2 and other boards: `-e
+minimal_rp2350`), with the audio on its second core; only the audio
+engine differs, one `.cpp` per chip.
 
 The project has an educational focus: highly documented code and a
 "modular synth" approach where DSP components are wired together in code.
@@ -25,7 +28,8 @@ The project has an educational focus: highly documented code and a
 - **Build one:** `pio run -e singing_bowls` (envs: minimal, singing_bowls,
   drum_machine, custom_voice, compile_all, profile, profile_all, patch_minimal,
   patch_demo, patch_hardware, patch_param, minimal_f401, oled,
-  aeolian_harp, easel, acid, noisebox, easel_matrix)
+  aeolian_harp, easel, acid, noisebox, easel_matrix; minimal_rp2350 is
+  outside default_envs)
 - **Upload:** `pio run -e <env> -t upload` (ST-Link on the SW header: DIO to
   SWDIO, SCK to SWCLK, GND; DFU is unreliable on WeAct F411 boards)
 - **Serial Monitor:** `pio device monitor` (examples print `AudioEngine::cpuLoad()`)
@@ -49,6 +53,8 @@ The project has an educational focus: highly documented code and a
 
 ## Hardware Specifications
 - **I2S Pins:** `PB12` (LRCLK), `PB13` (BCLK), `PB15` (DIN)
+- **DAC power:** VIN to the board's 5V pin, never 3V3 (UDA1334A and
+  MAX98357A alike)
 - **Control pins:** 23 free; 10 analog (PA0-PA7, PB0, PB1), the rest
   digital only. Full list in `docs/index.html` (Hardware) and
   `tools/gen_modules.py`
@@ -81,7 +87,10 @@ The project has an educational focus: highly documented code and a
 
 ### DSP Module Pattern
 - **Sample-by-Sample:** every module exposes a `process()` that handles one sample.
-- **Header-Only:** modules are `.h` files; only `engine/audio_engine.cpp` is compiled separately.
+- **Header-Only:** modules are `.h` files; only the engine is compiled separately:
+  `engine/audio_engine_stm32.cpp` or `engine/audio_engine_rp2.cpp`, each
+  wrapped in an `#if` for its chip (`ARDUINO_ARCH_STM32`,
+  `ARDUINO_ARCH_RP2040`). Keep chip `#if`s out of the DSP headers.
 - **Namespace:** everything lives in `namespace bb` (the user's `audioCallback()` stays global).
 - **Floating Point:** internal math uses `float`; audio is normalised to -1.0..1.0.
 - **Construction:** every class works after default construction. Ported

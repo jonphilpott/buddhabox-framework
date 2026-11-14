@@ -182,7 +182,8 @@ and GCC obeys the last <code>-O</code> it sees, so without it
  *    another block of samples. Fill the buffer one stereo frame at a time.
  * 3. setup(): configure the objects, then start the audio engine.
  *
- * Wiring: PB12 -&gt; LRCLK/WSEL, PB13 -&gt; BCLK, PB15 -&gt; DIN on the UDA1334A.
+ * Wiring: PB12 -&gt; LRCLK/WSEL, PB13 -&gt; BCLK, PB15 -&gt; DIN on the UDA1334A,
+ * and its VIN to the Black Pill&#x27;s 5V pin (not 3V3).
  */
 
 #include &lt;Arduino.h&gt;
@@ -303,7 +304,7 @@ go. To turn the LED off, for example to use PC13 yourself or with
   <tr><td>PB13</td><td>BCLK</td><td>Bit clock</td><td>32 x the sample rate</td></tr>
   <tr><td>PB15</td><td>DIN</td><td>Data</td><td>Philips I2S, MSB first</td></tr>
   <tr><td>GND</td><td>GND, MUTE, SF0, SF1</td><td>Ground</td><td>Tie MUTE and SF0/SF1 low for standard I2S</td></tr>
-  <tr><td>3V3</td><td>VIN</td><td>Power</td><td>Some boards accept 3.3&ndash;5 V</td></tr>
+  <tr><td>5V</td><td>VIN</td><td>Power</td><td>5 V, not 3V3 (see below)</td></tr>
 </table>
 
 <h3>Wiring: Black Pill to MAX98357A</h3>
@@ -317,10 +318,15 @@ go. To turn the LED off, for example to use PC13 yourself or with
   <tr><td>(open)</td><td>SD</td><td>Mode</td><td>Floating = (left + right) / 2 mono</td></tr>
 </table>
 
+<div class="note"><strong>Power the DAC from 5 V.</strong> Wire either
+board's VIN to the Black Pill's <strong>5V</strong> pin, never to 3V3.
+The 5V pin carries the USB supply, so the board must be powered over USB
+(or from 5 V on that pin), not from an ST-Link's 3.3 V alone.</div>
+
 <div class="note"><strong>Fixed pins.</strong> PB12, PB13 and PB15 are
 the SPI2/I2S2 alternate function (AF5) on both the F401 and F411. Other
 pins would need a different I2S peripheral and changes to
-<code>engine/audio_engine.cpp</code>.</div>
+<code>engine/audio_engine_stm32.cpp</code>.</div>
 
 <h3>Pins for knobs, switches and LEDs</h3>
 <p>After audio, USB and the debug port have taken their pins, the Black
@@ -451,6 +457,48 @@ void loop() {
 <p><code>Menu</code> reads no pins itself, so it works with any input.
 Redraw it on a <code>millis()</code> timer like any other drawing. The
 <code>acid</code> example uses one with 16 items.</p>
+
+<h3>RP2350 boards (Pico 2 and others)</h3>
+<p>The framework also runs on the RP2350, the chip on the Raspberry Pi
+Pico 2 and many smaller boards. Every DSP module is shared;
+only the audio engine differs. <code>engine/audio_engine_rp2.cpp</code>
+replaces the STM32 one, and each compiles to nothing on the other chip,
+so <code>audioCallback()</code>, <code>AudioEngine::begin()</code>,
+<code>cpuLoad()</code> and <code>cpuPeak()</code> work unchanged.</p>
+<ul>
+  <li><strong>Audio on the second core.</strong> The RP2350 has two
+    cores. The audio loop runs on core 1 and <code>loop()</code> gets
+    core 0 to itself, so a slow OLED update or serial print can't delay
+    the audio. A patch must not define <code>setup1()</code> or
+    <code>loop1()</code>: the engine uses them.</li>
+  <li><strong>Clock.</strong> The I2S is built from a PIO block, which
+    divides the system clock, and 150&nbsp;MHz doesn't divide into
+    44.1&nbsp;kHz cleanly. The engine moves the system clock to
+    144&nbsp;MHz, which does. Measured: 172.3 blocks a second, as
+    expected.</li>
+  <li><strong>Pins.</strong> Any RP2350 board works, since the pins are
+    the chip's GPIO numbers. BCLK on GP10, LRCLK on GP11 (always the pin
+    after BCLK) and DIN on GP12 by default; change them with
+    <code>-D BB_I2S_BCLK=2 -D BB_I2S_DOUT=4</code> in
+    <code>build_flags</code>. Power the DAC from the board's 5V (or
+    VBUS) pin, not 3V3, as on the Black Pill.</li>
+  <li><strong>No overrun LED:</strong> boards differ too much. Print
+    <code>cpuPeak()</code> instead; <code>loop()</code> keeps running
+    even when the audio core is overloaded.</li>
+  <li><strong>Speed.</strong> Measured with <code>profile_all</code>
+    (in a separate port of it), the RP2350's cores take about as many
+    cycles per sample as the F411 (median 0.96 times), and have about
+    1.5 times as many to spend at 144&nbsp;MHz, on each of two cores.
+    <code>minimal</code> uses 2.5% of core 1.</li>
+  <li><strong>Inputs and the OLED</strong> are still STM32-only:
+    <code>EncoderInput</code> uses an STM32 timer, and <code>Oled</code>
+    and the LED and switch defaults name STM32 pins.</li>
+</ul>
+<pre><code>pio run -e minimal_rp2350 -t upload   # hold BOOTSEL while plugging in</code></pre>
+<p>The board needs no ST-Link: it uploads over USB. The platform is a
+community fork of PlatformIO's (the one arduino-pico recommends), pinned
+to a commit in <code>platformio.ini</code>; the registry's own
+platform doesn't know the RP2350.</p>
 
 <h3>Signal path</h3>
 <div class="flow">

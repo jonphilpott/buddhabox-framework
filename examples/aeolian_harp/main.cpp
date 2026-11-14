@@ -36,7 +36,8 @@
  * Cost: about 50% of the F411's CPU (16 filters are ~400 cycles, the
  * reverb ~510). Generative: no controls, just wire up the DAC.
  *
- * Wiring: PB12 -> LRCLK/WSEL, PB13 -> BCLK, PB15 -> DIN on the UDA1334A.
+ * Wiring: PB12 -> LRCLK/WSEL, PB13 -> BCLK, PB15 -> DIN on the UDA1334A,
+ * and its VIN to the Black Pill's 5V pin (not 3V3).
  */
 
 #include <Arduino.h>

@@ -64,6 +64,7 @@
  *
  * Wiring:
  *   Audio  PB12 -> LRCLK/WSEL, PB13 -> BCLK, PB15 -> DIN (UDA1334A)
+ *          VIN -> 5V, GND -> GND (5 V, not 3V3)
  *   Knobs  (kKnobs only) 10k linear pots, outer legs to 3V3 and GND,
  *          wipers to PA0 timbre, PA1 FM depth, PA2 pulser rate,
  *          PA3 swell length
