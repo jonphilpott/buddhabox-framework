@@ -1267,6 +1267,44 @@ with five voices and the echo (the reverb is about 29%, the echo about
 8%), and uses 109&nbsp;KB of RAM, 64&nbsp;KB of it the echo.</p>
 <pre><code>pio run -e drone -t upload</code></pre>
 
+<h3>tanpura</h3>
+<p>A four-string tanpura, the drone of Indian classical music. The
+strings are plucked one after another and never damped, so each still
+rings when its turn comes round again. The usual tuning, in the order
+they are plucked, is pa, SA, SA, sa: SA is the root, sa the octave
+below and pa the fifth below SA. Tuning swaps the first string for ma,
+ni or dha, in just intonation. Root runs from C2 to C4 by note name,
+and Fine tunes it &plusmn;50 cents.</p>
+<p>Pattern picks a 5-beat cycle (pa SA SA sa, then a rest) or a 6-beat
+one (pa, rest, SA SA sa, rest); Tempo sets the beats a minute, from 20
+to 120. At the default 48, a 5-beat cycle lasts about 6 seconds.</p>
+<p>The tanpura's buzz comes from its wide bridge, the jawari: each swing
+of the string slaps against it, which throws energy into the high
+harmonics. Each string here is a Karplus-Strong loop with the bridge as
+a soft wall on one side: whatever swings past it is squashed a little.
+A wall can only take energy away, so the string always dies out; a
+first version that bent the loop's delay instead, as Elements does,
+rang forever in simulation with a tanpura's long sustain. With Jawari
+up, the treble lasts through the whole decay instead of dying in the
+first second. It also shortens the sustain: the buzz carries energy
+into the treble, where the loop loses it faster. Sustain therefore runs
+from 4 to 120 seconds without jawari; the default 60 gives about 20
+seconds at the default Jawari, in simulation. The pick is soft, cut at
+1.5&nbsp;kHz, so the attack doesn't stand far above the ring. Every
+string stays within 0.1 cent of its pitch at any setting.</p>
+<p>The eight pots are Volume on PA1, Tempo PA2, Jawari PA3, Bright PA4,
+Sustain PA5, Reverb PA6, Spread PA7 and Space PB0. Spread pans the
+strings apart with equal-power gains: at full, pa is hard left, sa hard
+right and the two SAs in the middle; at 0 the output is mono. The menu also holds
+Root, Fine, Tuning, Pattern and the reverb's Tone. One
+<code>Plucker</code> serves all four strings, since only one is
+plucked at a time. Wiring as for <code>acid</code>.</p>
+<p>The patch measured 67% of the CPU on the board (the reverb is 27%,
+each string about 8%) and uses 76&nbsp;KB of RAM. Each string is a
+custom class in <code>main.cpp</code>, as <code>StringModel</code>
+would cost 20% a string.</p>
+<pre><code>pio run -e tanpura -t upload</code></pre>
+
 <h3>oled</h3>
 <p>A knob on PA1 sets a tone's pitch, a rotary encoder on PB6/PB7
 transposes it in semitones, and the encoder's push switch on PB5 resets
