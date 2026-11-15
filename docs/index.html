@@ -1305,6 +1305,46 @@ custom class in <code>main.cpp</code>, as <code>StringModel</code>
 would cost 20% a string.</p>
 <pre><code>pio run -e tanpura -t upload</code></pre>
 
+<h3>tanpura_spectral</h3>
+<p>The same tanpura, resynthesised from a recording instead of modelled.
+<code>tools/analyse_tanpura.cpp</code> measured the tanpura at the start
+of a vintage tape of raga Malkauns, before the bansuri comes in: about
+ten seconds, four cycles of 2.1 seconds. With FFTs it found each
+string's 32 harmonics at 16 moments from one pluck to the next, then
+turned each moment into one cycle of waveform. Each string replays its
+own 16 waveforms from pluck to pluck, blending between neighbours, so
+they span exactly one cycle of the pattern at any tempo.</p>
+<p>Separating the strings took some arithmetic, since they share
+harmonics. With the low sa at 1, the SAs sit at 2 and the first string
+(ma, as Malkauns has no Pa) at 4/3. sa's odd harmonics are its own; its
+even ones also carry the SAs, so sa's share was estimated from its odd
+neighbours and the rest given to the SAs. Every third harmonic of ma
+lands on one of sa's, so those were estimated from ma's neighbours. The
+tape's hiss was measured between harmonics and taken off. Each string's
+pluck shows as a jump in its upper harmonics. The low sa's jawari then
+blooms: its share of power above the 8th harmonic climbs from a third
+to nearly three-quarters over 0.4 s and fades to under a tenth by the
+next pluck.</p>
+<p>The menu and pattern are <code>tanpura</code>'s; the ma spectrum
+serves for pa, ni and dha. Bright is a tilt filter on the mix, split at
+1.5&nbsp;kHz: 50 is as recorded. The two SA strings are 0.25&nbsp;Hz
+apart, so they beat slowly. The pots are Volume on PA1, Tempo PA2
+(20 to 160; the tape ran at about 140), Bright PA3, Fine PA4, Reverb
+PA5, Spread PA6, Space PA7 and Tone PB0.</p>
+<p>The first version played the 32 harmonics live with
+<code>HarmonicOscillator</code>, which measured about 500 cycles a
+sample per string on the board: four strings alone took 95% of the CPU.
+Reading two stored waveforms and blending them costs a few dozen. The
+patch measured 54% of the CPU (the reverb about 27%), peaks of about
+0.6&ndash;0.75 at full volume, and uses 42&nbsp;KB of RAM and 49&nbsp;KB
+of flash for the waveforms. To analyse another recording:</p>
+<pre><code>ffmpeg -t 20 -i recording.flac -ac 1 -ar 44100 -f f32le tanpura.f32
+clang++ -std=c++14 -O2 tools/analyse_tanpura.cpp -o /tmp/analyse
+/tmp/analyse tanpura.f32 4 14.5 161.69 &gt; examples/tanpura_spectral/spectra.h
+pio run -e tanpura_spectral -t upload</code></pre>
+<p>The arguments are a stretch with only the tanpura playing (seconds)
+and the low sa's pitch in Hz.</p>
+
 <h3>oled</h3>
 <p>A knob on PA1 sets a tone's pitch, a rotary encoder on PB6/PB7
 transposes it in semitones, and the encoder's push switch on PB5 resets
@@ -1646,6 +1686,10 @@ these changes:</p>
     write into a folder that isn't empty.</li>
   <li><code>tools/gen_tables.cpp</code> regenerates the flash lookup
     tables.</li>
+  <li><code>tools/analyse_tanpura.cpp</code> measures a recorded
+    tanpura's harmonics and writes
+    <code>examples/tanpura_spectral/spectra.h</code> (see that
+    example).</li>
   <li><code>tools/gen_docs.py</code> regenerates <code>reference.html</code>
     from the docstrings, and the catalogue and code listings on this
     page.</li>
