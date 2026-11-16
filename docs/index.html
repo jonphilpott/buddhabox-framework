@@ -1240,7 +1240,8 @@ ratios: Fifths (root, fifth, octave, sub-octave and twelfth), Octaves,
 Fourths, Major, Minor, Harmonics, or Colour. Colour keeps the root,
 fifth and sub, and takes the other two notes from a <code>Colour</code>
 scale, so the Colour item gives 16 just-intonation chords from dark to
-bright. Voices (1 to 5) thins the chord in an order that keeps its shape
+bright. Voices (1 to 5; 4 for Dark, Triangle and Slope) thins the chord
+in an order that keeps its shape
 (root, fifth, sub, then the upper two), turning the rest up to keep the
 level; silent oscillators aren't computed, saving about 4% of the CPU
 each. Root runs from C1 to C5 by note name, and Fine tunes it &plusmn;50
@@ -1259,12 +1260,17 @@ every sample: the filters' <code>setFrequency()</code> alone costs 183
 to 233 cycles. A make-up gain after each filter brings both to peaks of
 about 0.8 at full volume, measured at moderate resonance; the Moog
 thins its bass as resonance rises and the MS-20 doesn't, so at high
-resonance they drift apart. After 30&nbsp;s without the encoder the
-screen shows the output waveform, starting each trace where the wave
-crosses zero going up so it holds still; turning or pressing the
-encoder brings the menu back. The patch measured 74&ndash;75% of the CPU
-with five voices and the echo (the reverb is about 29%, the echo about
-8%), and uses 109&nbsp;KB of RAM, 64&nbsp;KB of it the echo.</p>
+resonance they drift apart. With five voices and the echo, the patch
+measured 74% of the CPU with Saw and the Moog, the cheapest setting
+(the reverb is about 29%, the echo about 8%). Each voice fewer saves
+about 4%. Dark, Triangle and Slope cost more per voice, so they play
+four voices at most: with five they took the CPU past 90%, where the
+screen lags. The dearest settings, Square and Slope with the MS-20,
+measured 89%. Any change to the code can move these figures by up to
+6 points, because the chip runs from flash through a small cache and
+speed depends on where the compiler places things. Over 100% every
+audio block runs late, and the menu, knobs and serial freeze. The
+patch uses 109&nbsp;KB of RAM, 64&nbsp;KB of it the echo.</p>
 <pre><code>pio run -e drone -t upload</code></pre>
 
 <h3>tanpura</h3>

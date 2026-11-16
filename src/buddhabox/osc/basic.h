@@ -146,11 +146,16 @@ public:
     } else if (shape_ == TRIANGLE || shape_ == SLOPE) {
       // 2b. Triangle/slope: no jumps, but corners (jumps in slope), fixed
       // with the integrated BLEP.
-      float slopeUp = 2.0f, slopeDown = 2.0f;
-      if (shape_ == SLOPE) {
-        slopeUp = 1.0f / pw;
-        slopeDown = 1.0f / (1.0f - pw);
+      // Rise and fall per cycle: 1 / pw and 1 / (1 - pw); 2 and 2 for
+      // the triangle, whose pw is always 0.5. A division costs about 14
+      // cycles on the Cortex-M4 and pw rarely changes, so keep the two
+      // and work them out again only when it does.
+      if (pw != slopePw_) {
+        slopePw_ = pw;
+        slopeUp_ = 1.0f / pw;
+        slopeDown_ = 1.0f / (1.0f - pw);
       }
+      float slopeUp = slopeUp_, slopeDown = slopeDown_;
       if (high_ ^ (phase_ < pw)) {
         float t = (phase_ - pw) / frequency;
         float discontinuity = (slopeUp + slopeDown) * frequency;
@@ -217,6 +222,9 @@ private:
   float hpState_ = 0.0f;
   bool high_ = false;
   bool needsSync_ = true;
+  // TRIANGLE/SLOPE: the pulse width and its reciprocals (-1: none
+  // worked out yet).
+  float slopePw_ = -1.0f, slopeUp_ = 2.0f, slopeDown_ = 2.0f;
 };
 
 } // namespace bb

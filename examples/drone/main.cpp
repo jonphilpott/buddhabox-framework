@@ -33,11 +33,6 @@
  *   press  start editing the item (its value shows as <value>)
  *   turn   change the value; press again to finish
  *
- * SCREENSAVER: after 30 seconds without the encoder, the screen shows
- * the output waveform; turn or press the encoder to get the menu back
- * (that first turn or press only wakes it). Knobs don't count: they
- * keep playing the sound while the scope runs.
- *
  * Wiring:
  *   Audio    PB12 -> LRCLK/WSEL, PB13 -> BCLK, PB15 -> DIN (UDA1334A)
  *            VIN -> 5V, GND -> GND (5 V, not 3V3)
@@ -50,9 +45,17 @@
  *            Set kKnobs = false without them. (PA0 is skipped: the
  *            board's KEY button is on it.)
  *
- * Cost: 74-75% of the F411's CPU with five voices and the echo, measured
- * on the board (the reverb is about 29%, the echo about 8%; each voice
- * fewer saves about 4%). 109 KB of RAM, 64 KB of it the echo's buffer.
+ * Cost, measured on the board with the echo (the reverb is about 29%,
+ * the echo about 8%; each voice fewer saves about 4%). Saw and Square
+ * play five voices; Dark, Triangle and Slope cost more per voice and
+ * play four at most, as five took the CPU past 90% and the screen lagged:
+ *   Moog    Saw 74%, Square 84%, Dark 83%, Triangle 83%, Slope 86%
+ *   MS-20   Saw 78%, Square 89%, Dark 85%, Triangle 86%, Slope 89%
+ * Any change to the code can move these by up to 6 points: the chip
+ * runs from flash through a small cache, so speed depends on where the
+ * compiler places things. Over 100% the audio can't keep up and loop()
+ * stops, freezing the menu, knobs and serial.
+ * 109 KB of RAM, 64 KB of it the echo's buffer.
  */
 
 #include <Arduino.h>
@@ -99,9 +102,6 @@ const float kFilterMax = 8000.0f;
 // After the filter, so they change the level, not the filter's tone.
 const float kMoogGain = 3.4f;
 const float kMs20Gain = 1.0f;
-// Screensaver: after this long without the encoder (turn or press), the
-// screen shows the output waveform; the encoder brings the menu back.
-const uint32_t kScreensaverMs = 30000;
 
 // ── The menu ─────────────────────────────────────────────────────────
 enum Item {
@@ -135,6 +135,7 @@ const char *const kChords[] = {"Fifths", "Octaves",   "Fourths", "Major",
                                "Minor",  "Harmonics", "Colour"};
 const int kColourChord = 6; // the last entry: ratios from the Colour
 const char *const kWaves[] = {"Saw", "Square", "Dark", "Triangle", "Slope"};
+const int kFirstCostlyWave = 2; // Dark onwards: four voices at most
 const BasicOscillator::Shape kShapes[] = {
     BasicOscillator::SAW, BasicOscillator::SQUARE, BasicOscillator::SQUARE_DARK,
     BasicOscillator::TRIANGLE, BasicOscillator::SLOPE};
@@ -265,27 +266,6 @@ int controlCounter = 0;
 float echoTime = 22050.0f; // where the echo reads now, gliding to echoSamples
 float echoTone = 0.0f;     // the feedback low-pass's state
 
-// ── Screensaver scope ────────────────────────────────────────────────
-// The audio interrupt fills scope[] with one screen's width of output;
-// loop() draws it. scopeState hands the buffer back and forth, so the
-// two never touch it at the same time:
-//   SCOPE_IDLE   nobody wants a trace (the menu is showing)
-//   SCOPE_ARMED  loop() wants one: the interrupt waits for the left
-//                channel to cross zero going up, so each trace starts
-//                at the same point in the wave and the picture holds
-//                still instead of jittering sideways
-//   SCOPE_FILL   the interrupt is writing scope[]
-//   SCOPE_READY  full: loop() draws it, then arms again
-// Cost: a compare per sample, plus a store every kScopeEvery samples.
-enum ScopeState { SCOPE_IDLE, SCOPE_ARMED, SCOPE_FILL, SCOPE_READY };
-const int kScopeWidth = 128;
-// One point every 4 samples: 128 points span 11.6 ms, about two cycles
-// of D3 (147 Hz).
-const int kScopeEvery = 4;
-volatile int scopeState = SCOPE_IDLE;
-int8_t scope[kScopeWidth]; // -31..31: rows above and below the middle
-int scopeIndex = 0, scopeSkip = 0, scopeWait = 0;
-float scopePrev = 0.0f;
 // Each oscillator's level into each channel: wobble times pan.
 float ampL[NUM_OSC], ampR[NUM_OSC];
 float noise_amount = 0.0f;
@@ -346,7 +326,14 @@ void applyMenu() {
     panR[i] = sqrtf(1.0f + p);
   }
   volume = items[VOLUME].value / 100.0f;
-  voices = items[VOICES].value;
+  // Dark, Triangle and Slope cost more per voice: with five, the CPU
+  // passes 90% and the screen lags, so they get four at most. The menu
+  // item's limit changes too, so it never shows 5 while playing 4.
+  MenuItem &v = items[VOICES];
+  v.max = items[WAVE].value >= kFirstCostlyWave ? NUM_OSC - 1 : NUM_OSC;
+  if (v.value > v.max)
+    v.value = v.max;
+  voices = v.value;
   voiceGain = sqrtf((float)NUM_OSC / voices);
   echoSamples = items[ECHO_TIME].value * (SAMPLE_RATE / 1000.0f);
   echoFeedback = items[FEEDBACK].value / 100.0f;
@@ -460,43 +447,10 @@ void audioCallback(int16_t *buffer, uint16_t length) {
     float gain = volume * 32000.0f;
     buffer[i] = (int16_t)(outL * gain);
     buffer[i + 1] = (int16_t)(outR * gain);
-
-    // 7. Screensaver scope (see ScopeState). Taken before Volume,
-    //    so the trace fills the screen however loud it's playing.
-    if (scopeState == SCOPE_ARMED) {
-      // Wait for an upward zero crossing, but not forever: after
-      // a block's worth, take whatever comes (a drone with the
-      // filter shut may never cross cleanly).
-      if ((scopePrev < 0.0f && outL >= 0.0f) || ++scopeWait > 256) {
-        scopeIndex = scopeSkip = scopeWait = 0;
-        scopeState = SCOPE_FILL;
-      }
-      scopePrev = outL;
-    }
-    if (scopeState == SCOPE_FILL && scopeSkip-- == 0) {
-      scopeSkip = kScopeEvery - 1;
-      scope[scopeIndex++] = (int8_t)(outL * 31.0f);
-      if (scopeIndex == kScopeWidth)
-        scopeState = SCOPE_READY;
-    }
   }
 }
 
 /** Draw one frame: a title bar with the root and chord, then the menu. */
-/**
- * Draw the screensaver: the last captured trace, one line segment per
- * column, centred on row 32. Returns false while no new trace is ready.
- */
-bool drawScope() {
-  if (scopeState != SCOPE_READY)
-    return false;
-  oled.clear();
-  for (int x = 1; x < kScopeWidth; x++)
-    oled.line(x - 1, 32 - scope[x - 1], x, 32 - scope[x]);
-  scopeState = SCOPE_ARMED; // ask for the next one
-  return true;
-}
-
 void drawScreen() {
   oled.rect(0, 0, 128, 8, true);
   int x = oled.text(2, 0, "DRONE  ", false);
@@ -552,29 +506,10 @@ void loop() {
       applyMenu();
   }
 
-  // 2. Menu: hand it the encoder and the switch. While the
-  //    screensaver is up, the first turn or press only wakes the
-  //    menu, so it can't change a setting you can't see.
+  // 2. Menu: hand it the encoder and the switch.
   push.update();
-  int turns = encoder.delta();
-  bool pressed = push.triggered();
-  static uint32_t lastActivity = 0;
-  static bool sleeping = false;
-  if (turns || pressed) {
-    lastActivity = millis();
-    if (sleeping) {
-      sleeping = false;
-      scopeState = SCOPE_IDLE;
-      turns = 0;
-      pressed = false;
-    }
-  }
-  if (menu.update(turns, pressed) == Menu::CHANGED)
+  if (menu.update(encoder.delta(), push.triggered()) == Menu::CHANGED)
     applyMenu();
-  if (!sleeping && haveScreen && millis() - lastActivity > kScreensaverMs) {
-    sleeping = true;
-    scopeState = SCOPE_ARMED;
-  }
 
   // 3. CPU load over USB serial once a second (pio device monitor).
   static uint32_t lastPrint = 0;
@@ -590,10 +525,7 @@ void loop() {
   static uint32_t lastFrame = 0;
   if (haveScreen && millis() - lastFrame >= 50) {
     lastFrame = millis();
-    if (!sleeping)
-      drawScreen();
-    else if (!drawScope())
-      lastFrame -= 50; // no trace yet: try again next loop()
+    drawScreen();
   }
   if (haveScreen)
     oled.display(1);
