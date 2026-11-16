@@ -546,7 +546,10 @@ public:
     }
   }
 
-private:
+// Protected, not private, so a driver for another panel can inherit
+// the drawing code and replace only begin() and display() (as the H7
+// port's Lcd does).
+protected:
   /** Send command bytes. The control byte 0x00 means "commands follow". */
   void command(const uint8_t *cmds, size_t count) {
     Wire.beginTransmission(address_);

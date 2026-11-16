@@ -66,7 +66,6 @@
 
 #include <Arduino.h>
 #include <cstdint>
-#include <stm32f4xx_hal.h>
 
 namespace bb {
 
