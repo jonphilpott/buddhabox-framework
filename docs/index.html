@@ -743,6 +743,21 @@ inlining them, which made some modules up to 2.5&times; slower in testing.
 If <code>cpuLoad()</code> is well above the sum of these figures, move
 groups of modules into voice classes (see below), which keeps each
 function small.</p>
+<p><strong>Running code from RAM is slower, not faster.</strong> The
+F411 reads code from flash through ST's ART accelerator, which fetches
+ahead and caches what it fetched, so a hit costs no wait. Code run from
+RAM loses that and shares the bus with the data it works on. Every
+attempt has been slower: putting <code>drone</code>'s
+<code>audioCallback()</code> in RAM (<code>.RamFunc</code>) took it
+from 74% to 92% of the CPU. Save cycles by doing less work instead,
+such as moving divisions and setters to control rate or playing fewer
+voices.</p>
+<p><strong>The same code can measure differently from one build to the
+next.</strong> Where the compiler places code decides how well the
+flash cache holds it. In <code>drone</code>, editing one oscillator
+moved the cost of waves that use none of its code by up to 6 points.
+Compare settings within one build, and measure again after any change
+to the code.</p>
 
 <h3>What the examples use</h3>
 <table>
