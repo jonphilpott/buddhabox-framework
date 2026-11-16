@@ -309,9 +309,14 @@ void applyMenu() {
   detune_hz = items[DETUNE].value * 0.08f;
   motion_hz = items[MOTION].value * 20.0f;
   chaos_mult = items[CHAOS].value / 100.0f;
-  // Rate 0.30 to 0.50: from about a loop a minute to about three a
-  // second. Below 0.30 the attractor barely moves.
-  chaos.setRate(0.30f + 0.20f * items[CHAOS_RATE].value / 100.0f);
+  // Chaos Rate is linear: the knob sets the speed as a fraction of the
+  // top speed (setRate(0.32), about 48 s per loop), so 50 is half as
+  // fast, 10 a tenth. setRate() is exponential, the speed doubling
+  // every 1/16.5, so undo it with a log: 0.32 + log2(fraction) / 16.5.
+  // Below about 3 it reaches setRate(0), the slowest, about 30 minutes
+  // per loop.
+  float fraction = items[CHAOS_RATE].value / 100.0f;
+  chaos.setRate(fraction > 0.0f ? 0.32f + log2f(fraction) / 16.5f : 0.0f);
   wobble = items[WOBBLE].value / 100.0f;
   noise_level = items[NOISE].value * 0.01f;
 
