@@ -139,7 +139,7 @@ MenuItem items[kItems] = {
     {"Cutoff", 30, 0, 100, 2},
     {"Resonance", 75, 0, 100, 2},
     {"Env Mod", 60, 0, 100, 2},
-    {"Decay", 40, 0, 100, 2},
+    {"Decay", 60, 0, 100, 2},
     {"Accent", 60, 0, 100, 2},
     {"Drive", 30, 0, 100, 2},
     {"Wave", 0, 0, 1, 1, kWaves},
@@ -281,10 +281,14 @@ void applyMenu() {
   // The interrupt sets it on the filters, with the chaos added.
   resonance = 0.0096f * items[RESONANCE].value;
   useMs20 = items[FILTER].value;
-  // Decay: 0.1 to 2 seconds, squared so the short, snappy settings get
-  // more of the range.
+  // Decay: 30 ms to 1.2 s (to -40 dB), exponential so each step of the
+  // knob changes the time by the same ratio. The note's gate only lasts
+  // half a step (60 ms at 125 BPM) before the VCA closes, so what you
+  // hear is how far the filter falls within those 60 ms: the range has
+  // to reach well below that, and a longer decay than ~1 s just holds
+  // the filter open for the whole note.
   float d = items[DECAY].value / 100.0f;
-  filterEnv.setRelease(0.1f + 1.9f * d * d);
+  filterEnv.setRelease(0.03f * powf(40.0f, d));
   accentAmount = items[ACCENT].value / 100.0f;
   drive.setDrive(items[DRIVE].value / 100.0f);
   osc.setShape(items[WAVE].value ? BasicOscillator::SQUARE
