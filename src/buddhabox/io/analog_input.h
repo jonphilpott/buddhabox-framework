@@ -115,7 +115,17 @@ public:
     // each time: it only sets a variable, and nothing else can then
     // change it behind our back.
     analogReadResolution(12);
-    raw_ = analogRead(pin_);
+
+    // Oversample: average several back-to-back reads. Random noise
+    // shrinks by sqrt(N) (8 reads = ~2.8x quieter) before the EMA even
+    // sees it, which matters because the examples use a high alpha
+    // (0.7) that barely smooths. Costs N x analogRead() in loop(),
+    // never in the audio ISR.
+    // ponytail: fixed 8 reads; make it a setter if a sketch needs speed.
+    uint32_t sum = 0;
+    for (int i = 0; i < kOversample; ++i)
+      sum += analogRead(pin_);
+    raw_ = (uint16_t)((sum + kOversample / 2) / kOversample); // rounded
 
     // 1. Smooth.
     if (!initialized_) {
@@ -188,9 +198,10 @@ public:
   uint16_t readRaw() const { return (uint16_t)smoothed_; }
 
   /**
-   * get the last actual read value from the ADC
+   * Get the last ADC value before smoothing: the average of the
+   * oversampled reads, with no EMA or hysteresis.
    *
-   * @return really raw adc val
+   * @return  Averaged ADC value, 0-4095
    */
   uint16_t readReallyRaw() const { return raw_; }
 
@@ -209,19 +220,21 @@ public:
    * Set the dead band: how far the reading must move before read()
    * follows it. Wider = steadier, but a little less resolution.
    *
-   * @param counts  Band in ADC counts (of 4095). Default 8 (0.2%):
-   *                enough to stop a smoothed pot flickering. 0 turns
-   *                hysteresis off; try 16-32 for long wires or a noisy
+   * @param counts  Band in ADC counts (of 4095). Default 16 (0.4%):
+   *                enough to stop a smoothed pot flickering on a
+   *                breadboard or a noisy PCB. 0 turns
+   *                hysteresis off; try 32-48 for long wires or a noisy
    *                supply.
    *
    * Example:
    *   AnalogInput steps(PA2, 0.3f);
-   *   steps.setHysteresis(24.0f); // 8 steps that never flicker
+   *   steps.setHysteresis(32.0f); // 8 steps that never flicker
    */
   void setHysteresis(float counts) { band_ = counts < 0.0f ? 0.0f : counts; }
 
 private:
-  static constexpr float kDefaultBand = 8.0f; // ADC counts
+  static constexpr float kDefaultBand = 16.0f; // ADC counts
+  static constexpr int kOversample = 8;        // ADC reads per update()
 
   uint8_t pin_;      // ADC pin number
   uint16_t raw_;     // last raw value

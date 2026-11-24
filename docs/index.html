@@ -358,12 +358,13 @@ with <code>-D BB_OVERRUN_LED=0</code>).</p>
 <p>Use a 10k linear potentiometer: one outer leg to 3V3, the other to
 GND, the middle leg (wiper) to an analog pin. Read it with
 <code>AnalogInput</code>, which gives 0.0 to 1.0 and smooths out ADC
-noise. The ADC is 12-bit (0&ndash;4095) and reads 0&ndash;3.3 V.</p>
+noise: each <code>update()</code> averages 8 reads, then smooths
+them. The ADC is 12-bit (0&ndash;4095) and reads 0&ndash;3.3 V.</p>
 <p>Smoothing alone leaves a resting knob wandering by a count or two,
 enough to flicker between two notes when the knob is snapped to steps.
 So <code>AnalogInput</code> also has hysteresis: its output stays still
-until the reading moves more than 8 counts, then follows it. Widen the
-band with <code>setHysteresis(24)</code> for long wires or a noisy
+until the reading moves more than 16 counts, then follows it. Widen the
+band with <code>setHysteresis(32)</code> for long wires or a noisy
 supply, or turn it off with <code>setHysteresis(0)</code>.</p>
 
 <h4>Wiring a switch</h4>

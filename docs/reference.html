@@ -3913,8 +3913,8 @@ float freq = mapf(val, 0.0f, 1.0f, 100.0f, 2000.0f);</code></pre>
 <div class="method-block"><div class="method-sig">uint16_t readRaw() const</div><div class="method-desc"><p>Get the smoothed value as a raw 12-bit integer (0–4095).</p>
 <p>Useful when you need integer precision or want to do your own scaling math. Before hysteresis: it still wanders by a count or so.</p>
 <div class="method-returns">Returns: Smoothed ADC value truncated to uint16_t</div></div></div>
-<div class="method-block"><div class="method-sig">uint16_t readReallyRaw() const</div><div class="method-desc"><p>get the last actual read value from the ADC</p>
-<div class="method-returns">Returns: really raw adc val</div></div></div>
+<div class="method-block"><div class="method-sig">uint16_t readReallyRaw() const</div><div class="method-desc"><p>Get the last ADC value before smoothing: the average of the oversampled reads, with no EMA or hysteresis.</p>
+<div class="method-returns">Returns: Averaged ADC value, 0-4095</div></div></div>
 <div class="method-block"><div class="method-sig">void setAlpha(float a)</div><div class="method-desc"><p>Change the smoothing factor at runtime.</p>
 <p class="example-label">Example:</p>
 <pre><code>// Switch to faster response when reading a knob
@@ -3923,8 +3923,8 @@ sensor.setAlpha(0.2f);</code></pre>
 <div class="method-block"><div class="method-sig">void setHysteresis(float counts)</div><div class="method-desc"><p>Set the dead band: how far the reading must move before read() follows it. Wider = steadier, but a little less resolution.</p>
 <p class="example-label">Example:</p>
 <pre><code>AnalogInput steps(PA2, 0.3f);
-steps.setHysteresis(24.0f); // 8 steps that never flicker</code></pre>
-<div class="method-param">Param <code>counts</code> — Band in ADC counts (of 4095). Default 8 (0.2%): enough to stop a smoothed pot flickering. 0 turns hysteresis off; try 16-32 for long wires or a noisy supply.</div></div></div>
+steps.setHysteresis(32.0f); // 8 steps that never flicker</code></pre>
+<div class="method-param">Param <code>counts</code> — Band in ADC counts (of 4095). Default 16 (0.4%): enough to stop a smoothed pot flickering on a breadboard or a noisy PCB. 0 turns hysteresis off; try 32-48 for long wires or a noisy supply.</div></div></div>
 </div>
 <h3 id="encoder-input-h">encoder_input.h</h3>
 <p class="include"><code>#include "buddhabox/io/encoder_input.h"</code> — One rotary encoder, counted in hardware by timer TIM4.</p>
